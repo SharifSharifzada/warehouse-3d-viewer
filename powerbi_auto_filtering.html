@@ -16,33 +16,21 @@
     <div id="viewer"></div>
 
     <script>
-        // Match by GUID or Material Name instead of primitive ID
-        const CONTAINER_MAP = {
-            'Container_Red': { 
-                guid: '407c48e0-f433-16b9-897c-ede17b5e8a37',
-                materialName: 'test1',
-                color: 0xff0000 
-            },
-            'Container_Green': { 
-                guid: 'a356650-49fa-16cf-aac7-c5e3b7d4a4f9',
-                materialName: 'test2',
-                color: 0x00ff00 
-            },
-            'Container_Blue': { 
-                guid: '17fc96a0-d7fe-11f0-8ab0-9339546166c3',
-                materialName: 'test3',
-                color: 0x0000ff 
-            },
-            'Container_Purple': { 
-                guid: '022b8f90-e247-11f0-aacc-e9f91898e217',
-                materialName: 'test',
-                color: 0x800080 
-            },
-            'Container_Cyan': { 
-                guid: 'edf19e580-e24a-11f0-aacc-e9f91898e217',
-                materialName: 'test',
-                color: 0x00ffff 
-            }
+        // Match containers by their GUID - EXACT format from your data
+        const CONTAINER_GUID_MAP = {
+            'Container_Red': '_407c48e0-f433-16b9-897c-ede17b5e8a37',
+            'Container_Green': 'a3564650-49fa-16cf-aac7-c5e3b7d4a4f9',
+            'Container_Blue': '_17fc96a0-d7fe-11f0-8ab0-933954616bc3',
+            'Container_Purple': '_022b8f90-e247-11f0-aacc-e9f91898e217',
+            'Container_Cyan': 'ed19e580-e24a-11f0-aacc-e9f91898e217'
+        };
+
+        const CONTAINER_COLORS = {
+            'Container_Red': 0xff0000,
+            'Container_Green': 0x00ff00,
+            'Container_Blue': 0x0000ff,
+            'Container_Purple': 0x800080,
+            'Container_Cyan': 0x00ffff
         };
 
         function getURLParameter(name) {
@@ -51,10 +39,10 @@
         }
 
         const urlSelectedContainer = getURLParameter('container');
-        console.log('Selected:', urlSelectedContainer);
+        console.log('🎯 Selected container:', urlSelectedContainer);
 
         let scene, camera, renderer, controls;
-        let model, allMeshes = [];
+        let model, allObjects = [];
         let glbLoaded = false;
         let pendingSelection = urlSelectedContainer;
         let originalMaterials = new Map();
@@ -106,9 +94,13 @@
             const loader = new THREE.GLTFLoader();
             const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/WareHouseIDTest_05.glb';
             
+            console.log('📦 Loading GLB...');
+            
             loader.load(
                 glbUrl,
                 (gltf) => {
+                    console.log('✅ GLB Loaded');
+                    
                     model = gltf.scene;
                     scene.add(model);
                     
@@ -118,50 +110,45 @@
                     const size = box.getSize(new THREE.Vector3());
                     model.position.set(-center.x, -center.y + size.y/2, -center.z);
                     
-                    // Collect ALL meshes and their materials
+                    // Traverse and log ALL objects with their names
+                    console.log('═══ Scanning GLB Structure ═══');
                     model.traverse((child) => {
+                        // Log everything - meshes, groups, objects
+                        console.log('Object:', child.name || 'unnamed', 'Type:', child.type, 'UUID:', child.uuid);
+                        
+                        // Store reference to ALL objects
+                        allObjects.push({
+                            object: child,
+                            name: child.name || '',
+                            uuid: child.uuid,
+                            type: child.type
+                        });
+                        
+                        // If it's a mesh, store its materials
                         if (child.isMesh) {
-                            // Store original materials
                             if (Array.isArray(child.material)) {
                                 child.material.forEach((mat, idx) => {
                                     const key = `${child.uuid}_${idx}`;
                                     originalMaterials.set(key, mat.clone());
-                                    
-                                    allMeshes.push({
-                                        mesh: child,
-                                        materialIndex: idx,
-                                        materialName: mat.name,
-                                        meshName: child.name
-                                    });
-                                    
-                                    console.log('Found:', child.name, '→ Material:', mat.name);
+                                    console.log('  Material[' + idx + ']:', mat.name || 'unnamed');
                                 });
                             } else {
-                                const key = child.uuid;
-                                originalMaterials.set(key, child.material.clone());
-                                
-                                allMeshes.push({
-                                    mesh: child,
-                                    materialIndex: -1,
-                                    materialName: child.material.name,
-                                    meshName: child.name
-                                });
-                                
-                                console.log('Found:', child.name, '→ Material:', child.material.name);
+                                originalMaterials.set(child.uuid, child.material.clone());
+                                console.log('  Material:', child.material.name || 'unnamed');
                             }
                         }
                     });
+                    console.log('═══════════════════════════════');
+                    console.log('Total objects found:', allObjects.length);
                     
-                    console.log('Total meshes:', allMeshes.length);
-                    
-                    // Fit camera to show all containers
+                    // Fit camera
                     fitCamera();
                     
                     glbLoaded = true;
                     
                     // Apply selection
                     if (pendingSelection) {
-                        setTimeout(() => selectContainer(pendingSelection), 200);
+                        setTimeout(() => selectContainer(pendingSelection), 300);
                     }
                 }
             );
@@ -173,61 +160,93 @@
                 return;
             }
             
-            console.log('═══════════════════════');
-            console.log('Selecting:', containerName);
+            console.log('═══════════════════════════════');
+            console.log('🎯 Selecting:', containerName);
             
-            const containerInfo = CONTAINER_MAP[containerName];
-            if (!containerInfo) {
-                console.log('Container not in map');
+            const guid = CONTAINER_GUID_MAP[containerName];
+            const color = CONTAINER_COLORS[containerName];
+            
+            if (!guid) {
+                console.log('❌ No GUID found for:', containerName);
                 return;
             }
             
-            console.log('Looking for material:', containerInfo.materialName);
+            console.log('Looking for GUID:', guid);
+            
+            // Try to find object by name matching GUID
+            // Object names might have underscore prefix like: _407c48e0-f433-16b9...
+            let matchedObjects = allObjects.filter(obj => {
+                if (!obj.name) return false;
+                
+                // Check exact GUID match
+                const exactMatch = obj.name.includes(guid);
+                // Check with underscore prefix
+                const underscoreMatch = obj.name.includes('_' + guid);
+                // Check partial GUID match (first part)
+                const guidStart = guid.split('-')[0];
+                const partialMatch = obj.name.includes(guidStart);
+                // Check with underscore + partial
+                const underscorePartialMatch = obj.name.includes('_' + guidStart);
+                
+                if (exactMatch || underscoreMatch || partialMatch || underscorePartialMatch) {
+                    console.log('✅ MATCH FOUND:', obj.name, '→ Type:', obj.type);
+                    return true;
+                }
+                return false;
+            });
+            
+            console.log('Found', matchedObjects.length, 'matching objects');
             
             // Reset all materials first
-            allMeshes.forEach((item) => {
-                const key = item.materialIndex >= 0 
-                    ? `${item.mesh.uuid}_${item.materialIndex}` 
-                    : item.mesh.uuid;
-                const originalMat = originalMaterials.get(key);
-                
-                if (originalMat) {
-                    if (item.materialIndex >= 0) {
-                        item.mesh.material[item.materialIndex] = originalMat.clone();
-                    } else {
-                        item.mesh.material = originalMat.clone();
+            allObjects.forEach((item) => {
+                if (item.object.isMesh) {
+                    const originalMat = originalMaterials.get(item.object.uuid);
+                    if (originalMat) {
+                        item.object.material = originalMat.clone();
                     }
                 }
             });
             
-            // Find and highlight matching material
-            const matchingMeshes = allMeshes.filter(item => 
-                item.materialName === containerInfo.materialName
-            );
-            
-            console.log('Found', matchingMeshes.length, 'matching meshes');
-            
-            if (matchingMeshes.length > 0) {
-                // Highlight all matching meshes with the container color
-                matchingMeshes.forEach((item) => {
-                    const highlightMat = new THREE.MeshStandardMaterial({
-                        color: containerInfo.color,
-                        emissive: containerInfo.color,
-                        emissiveIntensity: 0.7,
-                        roughness: 0.2,
-                        metalness: 0.8
-                    });
-                    
-                    if (item.materialIndex >= 0) {
-                        item.mesh.material[item.materialIndex] = highlightMat;
-                    } else {
-                        item.mesh.material = highlightMat;
+            if (matchedObjects.length > 0) {
+                // Highlight all matched objects
+                matchedObjects.forEach((item) => {
+                    if (item.object.isMesh) {
+                        const highlightMat = new THREE.MeshStandardMaterial({
+                            color: color,
+                            emissive: color,
+                            emissiveIntensity: 0.8,
+                            roughness: 0.2,
+                            metalness: 0.8
+                        });
+                        
+                        if (Array.isArray(item.object.material)) {
+                            item.object.material = item.object.material.map(() => highlightMat.clone());
+                        } else {
+                            item.object.material = highlightMat;
+                        }
+                        
+                        console.log('✅ Highlighted:', item.name);
                     }
+                    
+                    // Also try to highlight any child meshes
+                    item.object.traverse((child) => {
+                        if (child.isMesh && child !== item.object) {
+                            const highlightMat = new THREE.MeshStandardMaterial({
+                                color: color,
+                                emissive: color,
+                                emissiveIntensity: 0.8,
+                                roughness: 0.2,
+                                metalness: 0.8
+                            });
+                            child.material = highlightMat;
+                            console.log('  ✅ Highlighted child mesh');
+                        }
+                    });
                 });
                 
-                // Focus camera on first matching mesh
-                const firstMatch = matchingMeshes[0];
-                const box = new THREE.Box3().setFromObject(firstMatch.mesh);
+                // Focus camera on first matched object
+                const firstMatch = matchedObjects[0].object;
+                const box = new THREE.Box3().setFromObject(firstMatch);
                 const center = box.getCenter(new THREE.Vector3());
                 const size = box.getSize(new THREE.Vector3());
                 const maxDim = Math.max(size.x, size.y, size.z);
@@ -241,12 +260,13 @@
                 camera.lookAt(center);
                 controls.target.copy(center);
                 
-                console.log('✅ Highlighted and focused');
+                console.log('📷 Camera focused');
             } else {
-                console.log('❌ No matching meshes found');
+                console.log('❌ No objects matched GUID:', guid);
+                console.log('Available object names:', allObjects.map(o => o.name).filter(n => n));
             }
             
-            console.log('═══════════════════════');
+            console.log('═══════════════════════════════');
         }
 
         function fitCamera() {
