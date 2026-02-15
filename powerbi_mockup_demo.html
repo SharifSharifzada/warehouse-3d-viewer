@@ -710,7 +710,7 @@
             const loader = new THREE.GLTFLoader();
             
             // IMPORTANT: Change this URL after uploading to GitHub!
-           const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/WareHouseIDTest_05.glb';
+            const glbUrl = 'WareHouseIDTest_05.glb';
             
             loader.load(
                 glbUrl,
@@ -780,21 +780,6 @@
                 scene.add(mesh);
                 containerMeshes.push({ id: container.id, mesh, originalMaterial: material.clone() });
             });
-            
-            // Controls
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-            controls.target.set(0, 0, 0);
-            
-            // Handle resize
-            window.addEventListener('resize', () => {
-                camera.aspect = container.clientWidth / container.clientHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(container.clientWidth, container.clientHeight);
-            });
-            
-            animate();
         }
 
         function animate() {
