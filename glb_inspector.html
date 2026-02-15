@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>GLB Inspector - Find Primitive IDs</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #0f0;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #0ff;
+            text-align: center;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        #viewer {
+            background: #000;
+            border: 2px solid #0f0;
+            border-radius: 8px;
+            height: 600px;
+        }
+        
+        .info-panel {
+            background: #0a0a0a;
+            border: 2px solid #0f0;
+            border-radius: 8px;
+            padding: 20px;
+            height: 600px;
+            overflow-y: auto;
+        }
+        
+        .primitive {
+            background: #1a1a1a;
+            border: 1px solid #0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .primitive:hover {
+            background: #2a2a2a;
+            border-color: #0ff;
+            transform: scale(1.02);
+        }
+        
+        .primitive.selected {
+            background: #0a3a0a;
+            border-color: #0ff;
+            border-width: 2px;
+        }
+        
+        .primitive-id {
+            color: #ff0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .material-name {
+            color: #0ff;
+            font-size: 14px;
+        }
+        
+        .mesh-name {
+            color: #f0f;
+            font-size: 12px;
+        }
+        
+        .status {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 255, 0, 0.9);
+            color: #000;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        .mapping-result {
+            background: #0a0a0a;
+            border: 2px solid #ff0;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 8px;
+        }
+        
+        .mapping-result h3 {
+            color: #ff0;
+            margin-bottom: 10px;
+        }
+        
+        .mapping-code {
+            background: #000;
+            padding: 10px;
+            border-radius: 5px;
+            white-space: pre;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+    <h1>🔍 GLB Model Inspector</h1>
+    <div class="status" id="status">Loading GLB model...</div>
+    
+    <div class="container">
+        <div id="viewer"></div>
+        
+        <div class="info-panel">
+            <h2 style="color: #0ff;">📦 Primitives Found:</h2>
+            <p style="color: #ff0;">Click on a primitive to highlight it in the 3D viewer</p>
+            <div id="primitives-list"></div>
+            
+            <div class="mapping-result" id="mapping-result" style="display: none;">
+                <h3>✅ Corrected Mapping for Your HTML:</h3>
+                <div class="mapping-code" id="mapping-code"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let scene, camera, renderer, controls;
+        let primitives = [];
+        let selectedPrimitive = null;
+        let originalMaterials = [];
+
+        function init() {
+            const container = document.getElementById('viewer');
+            
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000);
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(8, 6, 8);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+            
+            // Lights
+            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            dirLight.position.set(10, 10, 5);
+            scene.add(dirLight);
+            
+            // Ground
+            const ground = new THREE.Mesh(
+                new THREE.PlaneGeometry(20, 20),
+                new THREE.MeshStandardMaterial({ color: 0x111111 })
+            );
+            ground.rotation.x = -Math.PI / 2;
+            scene.add(ground);
+            
+            // Grid
+            const grid = new THREE.GridHelper(20, 20, 0x00ff00, 0x003300);
+            scene.add(grid);
+            
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.target.set(0, 0, 0);
+            
+            loadGLB();
+            animate();
+        }
+
+        function loadGLB() {
+            const loader = new THREE.GLTFLoader();
+            const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/WareHouseIDTest_05.glb';
+            
+            loader.load(
+                glbUrl,
+                (gltf) => {
+                    document.getElementById('status').textContent = '✅ GLB Loaded Successfully!';
+                    setTimeout(() => {
+                        document.getElementById('status').style.display = 'none';
+                    }, 2000);
+                    
+                    const model = gltf.scene;
+                    scene.add(model);
+                    
+                    // Center model
+                    const box = new THREE.Box3().setFromObject(model);
+                    const center = box.getCenter(new THREE.Vector3());
+                    model.position.sub(center);
+                    
+                    // Extract primitives
+                    let primitiveIndex = 0;
+                    
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            if (Array.isArray(child.material)) {
+                                child.material.forEach((mat, idx) => {
+                                    originalMaterials.push(mat.clone());
+                                    primitives.push({
+                                        primitiveID: primitiveIndex,
+                                        mesh: child,
+                                        materialIndex: idx,
+                                        materialName: mat.name || 'Unnamed',
+                                        meshName: child.name || 'Unnamed Mesh',
+                                        color: mat.color ? mat.color.getHex() : 0xcccccc
+                                    });
+                                    primitiveIndex++;
+                                });
+                            } else {
+                                originalMaterials.push(child.material.clone());
+                                primitives.push({
+                                    primitiveID: primitiveIndex,
+                                    mesh: child,
+                                    materialIndex: -1,
+                                    materialName: child.material.name || 'Unnamed',
+                                    meshName: child.name || 'Unnamed Mesh',
+                                    color: child.material.color ? child.material.color.getHex() : 0xcccccc
+                                });
+                                primitiveIndex++;
+                            }
+                        }
+                    });
+                    
+                    displayPrimitives();
+                    generateMapping();
+                },
+                (xhr) => {
+                    const progress = (xhr.loaded / xhr.total * 100).toFixed(0);
+                    document.getElementById('status').textContent = `Loading: ${progress}%`;
+                },
+                (error) => {
+                    document.getElementById('status').textContent = '❌ Failed to load GLB';
+                    document.getElementById('status').style.background = 'rgba(255, 0, 0, 0.9)';
+                    console.error(error);
+                }
+            );
+        }
+
+        function displayPrimitives() {
+            const listDiv = document.getElementById('primitives-list');
+            listDiv.innerHTML = '';
+            
+            primitives.forEach((prim) => {
+                const div = document.createElement('div');
+                div.className = 'primitive';
+                div.innerHTML = `
+                    <div class="primitive-id">Primitive ID: ${prim.primitiveID}</div>
+                    <div class="material-name">Material: ${prim.materialName}</div>
+                    <div class="mesh-name">Mesh: ${prim.meshName}</div>
+                    <div style="color: #888; font-size: 11px;">
+                        Color: #${prim.color.toString(16).padStart(6, '0')} 
+                        ${prim.materialIndex >= 0 ? `(Material[${prim.materialIndex}])` : '(Single Material)'}
+                    </div>
+                `;
+                
+                div.onclick = () => selectPrimitive(prim);
+                listDiv.appendChild(div);
+            });
+        }
+
+        function selectPrimitive(prim) {
+            // Reset previous selection
+            if (selectedPrimitive !== null) {
+                const prevPrim = primitives[selectedPrimitive];
+                if (prevPrim.materialIndex >= 0) {
+                    prevPrim.mesh.material[prevPrim.materialIndex] = originalMaterials[selectedPrimitive].clone();
+                } else {
+                    prevPrim.mesh.material = originalMaterials[selectedPrimitive].clone();
+                }
+            }
+            
+            // Highlight new selection
+            const highlightMat = new THREE.MeshStandardMaterial({
+                color: 0xffff00,
+                emissive: 0xffff00,
+                emissiveIntensity: 0.8,
+                roughness: 0.2,
+                metalness: 0.8
+            });
+            
+            if (prim.materialIndex >= 0) {
+                prim.mesh.material[prim.materialIndex] = highlightMat;
+            } else {
+                prim.mesh.material = highlightMat;
+            }
+            
+            selectedPrimitive = prim.primitiveID;
+            
+            // Update UI
+            document.querySelectorAll('.primitive').forEach((el, idx) => {
+                el.classList.toggle('selected', idx === prim.primitiveID);
+            });
+            
+            // Focus camera
+            const box = new THREE.Box3().setFromObject(prim.mesh);
+            const center = box.getCenter(new THREE.Vector3());
+            camera.lookAt(center);
+            controls.target.copy(center);
+        }
+
+        function generateMapping() {
+            const csvData = {
+                'Container_Red': { primitiveID: 0, color: 0xff6b6b },
+                'Container_Green': { primitiveID: 1, color: 0x4ecdc4 },
+                'Container_Blue': { primitiveID: 2, color: 0x45b7d1 },
+                'Container_Purple': { primitiveID: 3, color: 0xb088f9 },
+                'Container_Cyan': { primitiveID: 4, color: 0x00d9ff }
+            };
+            
+            let mappingCode = `const CONTAINER_MAP = {\n`;
+            
+            Object.keys(csvData).forEach((containerName, idx) => {
+                const csvPrimitiveID = csvData[containerName].primitiveID;
+                const color = csvData[containerName].color;
+                
+                if (primitives[csvPrimitiveID]) {
+                    mappingCode += `    '${containerName}': { id: ${idx + 1}, primitiveID: ${csvPrimitiveID}, color: 0x${color.toString(16)}, materialName: '${primitives[csvPrimitiveID].materialName}' },\n`;
+                } else {
+                    mappingCode += `    '${containerName}': { id: ${idx + 1}, primitiveID: ${csvPrimitiveID}, color: 0x${color.toString(16)}, materialName: 'NOT FOUND IN GLB!' },\n`;
+                }
+            });
+            
+            mappingCode += `};`;
+            
+            document.getElementById('mapping-code').textContent = mappingCode;
+            document.getElementById('mapping-result').style.display = 'block';
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('load', init);
+        
+        window.addEventListener('resize', () => {
+            const container = document.getElementById('viewer');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+    </script>
+</body>
+</html>
