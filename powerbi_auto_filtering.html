@@ -1,262 +1,63 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Warehouse Viewer - Power BI Auto Filtering</title>
-    <style>
-        body { 
-            margin: 0; 
-            overflow: hidden; 
-            font-family: Arial, sans-serif;
-        }
-        #canvas-container { 
-            width: 100vw; 
-            height: 100vh; 
-        }
-        #info {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-            font-size: 14px;
-            max-width: 300px;
-        }
-    </style>
-</head>
-<body>
-    <div id="canvas-container"></div>
-    <div id="info">
-        <div id="selected-container">No container selected</div>
-        <div id="debug-info" style="margin-top: 10px; font-size: 11px; color: #aaa;"></div>
-    </div>
+// Focus function - THIS IS WHAT YOU'RE MISSING
+function focusOnContainer(containerName) {
+    if (!containerName) {
+        console.log('No container selected, showing all');
+        return;
+    }
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script>
-        // Get container name from URL parameter
-        function getURLParameter(name) {
-            const urlParams = new URLSearchParams(window.location.search);
-            return urlParams.get(name);
-        }
+    const meshId = containerToMeshMapping[containerName];
+    
+    if (!meshId) {
+        console.error(`Container mesh not found: ${containerName}`);
+        console.log('Available containers:', Object.keys(containerToMeshMapping));
+        return;
+    }
 
-        // Container to MeshID mapping based on your data
-        const containerToMeshMapping = {
-            "Container_Red": "0",
-            "Container_Green": "1",
-            "Container_Blue": "2",
-            "Container_Purple": "3",
-            "Container_Cyan": "4"
-        };
+    // Find mesh by MeshID in your scene
+    const mesh = scene.children.find(obj => 
+        obj.userData && obj.userData.meshId === meshId
+    );
 
-        // Get selected container from URL
-        const selectedContainer = getURLParameter('container');
-        console.log('Selected Container:', selectedContainer);
-
-        // Update UI
-        if (selectedContainer) {
-            document.getElementById('selected-container').textContent = 
-                `Selected: ${selectedContainer}`;
-        }
-
-        // Scene setup
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x1a1a1a);
-
-        const camera = new THREE.PerspectiveCamera(
-            75, 
-            window.innerWidth / window.innerHeight, 
-            0.1, 
-            1000
-        );
-        camera.position.set(15, 15, 15);
-
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.getElementById('canvas-container').appendChild(renderer.domElement);
-
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(ambientLight);
-
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(10, 10, 10);
-        scene.add(directionalLight);
-
-        // Create containers (5 containers as per your data)
-        const containers = [];
-        const colors = [0xff0000, 0x00ff00, 0x0000ff, 0x800080, 0x00ffff];
-        const containerNames = ['Container_Red', 'Container_Green', 'Container_Blue', 'Container_Purple', 'Container_Cyan'];
+    if (mesh) {
+        console.log('✅ Found mesh:', mesh);
         
-        for (let i = 0; i < 5; i++) {
-            const geometry = new THREE.BoxGeometry(2, 3, 2);
-            const material = new THREE.MeshPhongMaterial({ 
-                color: colors[i],
-                transparent: true,
-                opacity: 0.8
-            });
-            const container = new THREE.Mesh(geometry, material);
-            
-            // Position containers in a row
-            container.position.set(i * 4 - 8, 1.5, 0);
-            
-            // CRITICAL: Set the mesh name and userData for identification
-            container.name = i.toString(); // MeshID as name
-            container.userData = {
-                meshId: i.toString(),
-                containerName: containerNames[i],
-                containerId: i + 1
-            };
-            
-            scene.add(container);
-            containers.push(container);
-            
-            console.log(`Created container: ${containerNames[i]}, MeshID: ${i}, Position:`, container.position);
-        }
-
-        // Ground plane
-        const groundGeometry = new THREE.PlaneGeometry(50, 50);
-        const groundMaterial = new THREE.MeshPhongMaterial({ 
-            color: 0x333333,
-            side: THREE.DoubleSide 
-        });
-        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-        ground.rotation.x = Math.PI / 2;
-        scene.add(ground);
-
-        // Grid helper
-        const gridHelper = new THREE.GridHelper(50, 50, 0x444444, 0x222222);
-        scene.add(gridHelper);
-
-        // Simple orbit controls (mouse drag to rotate)
-        let isDragging = false;
-        let previousMousePosition = { x: 0, y: 0 };
-        let cameraRotation = { x: 0, y: 0 };
-
-        renderer.domElement.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            previousMousePosition = { x: e.clientX, y: e.clientY };
-        });
-
-        renderer.domElement.addEventListener('mousemove', (e) => {
-            if (isDragging) {
-                const deltaX = e.clientX - previousMousePosition.x;
-                const deltaY = e.clientY - previousMousePosition.y;
-                
-                cameraRotation.y += deltaX * 0.005;
-                cameraRotation.x += deltaY * 0.005;
-                
-                previousMousePosition = { x: e.clientX, y: e.clientY };
-            }
-        });
-
-        renderer.domElement.addEventListener('mouseup', () => {
-            isDragging = false;
-        });
-
-        // Focus function - THIS IS THE KEY PART
-        function focusOnContainer(containerName) {
-            if (!containerName) {
-                console.log('No container selected, showing all');
-                document.getElementById('debug-info').textContent = 'Showing all containers';
-                return;
-            }
-
-            const meshId = containerToMeshMapping[containerName];
-            
-            if (!meshId) {
-                console.error(`Container mesh not found: ${containerName}`);
-                console.log('Available containers:', Object.keys(containerToMeshMapping));
-                document.getElementById('debug-info').innerHTML = 
-                    `❌ Error: Container "${containerName}" not found<br>Available: ${Object.keys(containerToMeshMapping).join(', ')}`;
-                return;
-            }
-
-            // Find mesh by MeshID
-            const mesh = scene.children.find(obj => 
-                obj.userData && obj.userData.meshId === meshId
-            );
-
-            if (mesh) {
-                console.log('Found mesh:', mesh);
-                console.log('Mesh position:', mesh.position);
-                
-                // Highlight the selected container
-                containers.forEach(c => {
-                    if (c === mesh) {
-                        c.material.opacity = 1.0;
-                        c.material.emissive = new THREE.Color(0x444444);
-                    } else {
-                        c.material.opacity = 0.3;
-                        c.material.emissive = new THREE.Color(0x000000);
-                    }
-                });
-
-                // Focus camera on mesh
-                const distance = 8;
-                camera.position.set(
-                    mesh.position.x + distance,
-                    mesh.position.y + distance * 0.7,
-                    mesh.position.z + distance
-                );
-                camera.lookAt(mesh.position);
-
-                document.getElementById('debug-info').innerHTML = 
-                    `✅ Focused on: ${containerName}<br>MeshID: ${meshId}<br>Position: (${mesh.position.x.toFixed(1)}, ${mesh.position.y.toFixed(1)}, ${mesh.position.z.toFixed(1)})`;
-                    
-            } else {
-                console.error(`Mesh not found for MeshID: ${meshId}`);
-                console.log('Scene children:', scene.children.map(obj => ({
-                    name: obj.name,
-                    type: obj.type,
-                    userData: obj.userData
-                })));
-                
-                document.getElementById('debug-info').innerHTML = 
-                    `❌ Error: Mesh not found for MeshID ${meshId}`;
-            }
-        }
-
-        // Apply focus after scene is ready
-        setTimeout(() => {
-            if (selectedContainer) {
-                focusOnContainer(selectedContainer);
-            }
-        }, 100);
-
-        // Animation loop
-        function animate() {
-            requestAnimationFrame(animate);
-
-            // Apply camera rotation from mouse drag
-            if (!isDragging) {
-                const radius = Math.sqrt(
-                    camera.position.x * camera.position.x + 
-                    camera.position.z * camera.position.z
-                );
-                camera.position.x = radius * Math.cos(cameraRotation.y);
-                camera.position.z = radius * Math.sin(cameraRotation.y);
-                camera.position.y = 15 + cameraRotation.x * 10;
-                
-                // Keep camera looking at center unless focused
-                if (!selectedContainer) {
-                    camera.lookAt(0, 0, 0);
+        // Highlight selected container
+        scene.children.forEach(obj => {
+            if (obj.isMesh && obj.userData && obj.userData.meshId !== undefined) {
+                if (obj === mesh) {
+                    obj.material.opacity = 1.0;
+                    obj.material.emissive = new THREE.Color(0x444444);
+                } else {
+                    obj.material.opacity = 0.3;
+                    obj.material.emissive = new THREE.Color(0x000000);
                 }
             }
-
-            renderer.render(scene, camera);
-        }
-
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        animate();
-    </script>
-</body>
-</html>
+        // Focus camera on the selected mesh
+        const distance = 8;
+        camera.position.set(
+            mesh.position.x + distance,
+            mesh.position.y + distance * 0.7,
+            mesh.position.z + distance
+        );
+        camera.lookAt(mesh.position);
+        
+        console.log('✅ Camera focused on:', containerName);
+        
+    } else {
+        console.error(`❌ Mesh not found for MeshID: ${meshId}`);
+        console.log('Available meshes:', scene.children.filter(obj => obj.isMesh).map(obj => ({
+            name: obj.name,
+            userData: obj.userData
+        })));
+    }
+}
+
+// Call the focus function after your scene is loaded
+// Put this AFTER all your meshes are created
+setTimeout(() => {
+    if (selectedContainer) {
+        focusOnContainer(selectedContainer);
+    }
+}, 100);
