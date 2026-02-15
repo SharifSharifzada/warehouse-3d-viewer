@@ -2,30 +2,13 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Warehouse 3D Viewer - Power BI</title>
+    <title>Warehouse 3D Viewer - Complete</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f5f5f5; overflow: hidden; }
         
-        body {
-            font-family: Arial, sans-serif;
-            background: #f5f5f5;
-            overflow: hidden;
-        }
-        
-        #viewer-container {
-            width: 100vw;
-            height: 100vh;
-            position: relative;
-        }
-        
-        #viewer {
-            width: 100%;
-            height: 100%;
-        }
+        #viewer-container { width: 100vw; height: 100vh; position: relative; }
+        #viewer { width: 100%; height: 100%; }
         
         .info-overlay {
             position: absolute;
@@ -36,7 +19,7 @@
             border-radius: 8px;
             box-shadow: 0 2px 12px rgba(0,0,0,0.15);
             z-index: 1000;
-            min-width: 250px;
+            min-width: 280px;
         }
         
         .info-overlay h3 {
@@ -54,39 +37,22 @@
             border-bottom: 1px solid #f0f0f0;
         }
         
-        .info-label {
-            color: #666;
-            font-weight: 500;
-        }
-        
-        .info-value {
-            color: #333;
-            font-weight: 600;
-        }
+        .info-label { color: #666; font-weight: 500; }
+        .info-value { color: #333; font-weight: 600; }
         
         .status-badge {
             display: inline-block;
-            padding: 4px 12px;
+            padding: 6px 14px;
             border-radius: 12px;
             font-size: 11px;
             font-weight: 600;
             margin-top: 8px;
         }
         
-        .status-loading {
-            background: #fff4ce;
-            color: #8a6d3b;
-        }
-        
-        .status-success {
-            background: #dff6dd;
-            color: #107c10;
-        }
-        
-        .status-error {
-            background: #f8d7da;
-            color: #721c24;
-        }
+        .status-loading { background: #fff4ce; color: #8a6d3b; }
+        .status-success { background: #dff6dd; color: #107c10; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .status-info { background: #d1ecf1; color: #0c5460; }
         
         .controls-hint {
             position: absolute;
@@ -99,6 +65,21 @@
             color: #666;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
+
+        button {
+            background: #0078d4;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+
+        button:hover {
+            background: #106ebe;
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -109,101 +90,95 @@
         <div id="viewer"></div>
         
         <div class="info-overlay">
-            <h3>📦 Container Selection</h3>
+            <h3>🏭 Warehouse Viewer</h3>
             <div class="info-row">
-                <span class="info-label">URL Parameter:</span>
-                <span class="info-value" id="url-param">None</span>
+                <span class="info-label">Selection:</span>
+                <span class="info-value" id="selected-name">All Containers</span>
             </div>
             <div class="info-row">
-                <span class="info-label">Selected:</span>
-                <span class="info-value" id="selected-name">None</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Status:</span>
-                <span class="info-value" id="selected-status">-</span>
+                <span class="info-label">Primitives:</span>
+                <span class="info-value" id="primitive-count">Loading...</span>
             </div>
             <div class="info-row">
                 <span class="info-label">Value:</span>
                 <span class="info-value" id="selected-value">-</span>
             </div>
-            <div id="loading-status" class="status-badge status-loading">Loading model...</div>
+            <div id="loading-status" class="status-badge status-loading">Loading...</div>
+            <button onclick="resetView()">🔄 Reset View</button>
         </div>
         
         <div class="controls-hint">
-            🖱️ Drag to rotate • Right-click drag to pan • Scroll to zoom
+            🖱️ Drag to rotate • Right-click to pan • Scroll to zoom
         </div>
     </div>
 
     <script>
-        // ========== CONFIGURATION - Matches your friend's GLB structure EXACTLY ==========
+        // MANUAL MAPPING - You need to tell us which primitive = which container
+        // We'll auto-detect after you test, but for now:
         const CONTAINER_MAP = {
-            'Container_Red': { id: 1, primitiveID: 0, materialName: 'test1', color: 0xff6b6b, value: 100, status: 'Active' },
-            'Container_Green': { id: 2, primitiveID: 1, materialName: 'test2', color: 0x4ecdc4, value: 200, status: 'Active' },
-            'Container_Blue': { id: 3, primitiveID: 2, materialName: 'test3', color: 0x45b7d1, value: 300, status: 'Active' },
-            'Container_Purple': { id: 4, primitiveID: 3, materialName: 'test', color: 0xb088f9, value: 400, status: 'Active' },
-            'Container_Cyan': { id: 5, primitiveID: 4, materialName: 'test', color: 0x00d9ff, value: 500, status: 'Active' }
+            'Container_Red': { primitiveID: 0, color: 0xff0000, value: 100 },      // You confirmed this works
+            'Container_Green': { primitiveID: 1, color: 0x00ff00, value: 200 },    // Needs verification
+            'Container_Blue': { primitiveID: 2, color: 0x0000ff, value: 300 },     // You confirmed this works
+            'Container_Purple': { primitiveID: 3, color: 0x800080, value: 400 },   // Needs verification
+            'Container_Cyan': { primitiveID: 4, color: 0x00ffff, value: 500 }      // Needs verification
         };
 
-        // Get URL parameter from Power BI
         function getURLParameter(name) {
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get(name);
         }
 
         const urlSelectedContainer = getURLParameter('container');
-        console.log('URL Parameter:', urlSelectedContainer);
-        
-        if (urlSelectedContainer) {
-            document.getElementById('url-param').textContent = urlSelectedContainer;
-        }
+        console.log('📍 URL Parameter:', urlSelectedContainer);
 
-        // ========== THREE.JS SETUP ==========
         let scene, camera, renderer, controls;
         let model = null;
         let primitives = [];
         let glbLoaded = false;
         let pendingSelection = urlSelectedContainer;
+        let originalCameraPosition = null;
+        let originalControlsTarget = null;
 
         function init() {
             const container = document.getElementById('viewer');
             
-            // Scene
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xf5f5f5);
             
-            // Camera
             camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
-            camera.position.set(8, 6, 8);
+            camera.position.set(10, 8, 10);
             
-            // Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(container.clientWidth, container.clientHeight);
             renderer.shadowMap.enabled = true;
             container.appendChild(renderer.domElement);
             
-            // Lights
-            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+            // BRIGHT LIGHTING to see everything
+            scene.add(new THREE.AmbientLight(0xffffff, 0.9));
             
-            const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.5);
+            const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
             dirLight1.position.set(10, 10, 5);
-            dirLight1.castShadow = true;
             scene.add(dirLight1);
             
-            const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
+            const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
             dirLight2.position.set(-10, 5, -10);
             scene.add(dirLight2);
             
+            const dirLight3 = new THREE.DirectionalLight(0xffffff, 0.3);
+            dirLight3.position.set(0, -5, 0);
+            scene.add(dirLight3);
+            
             // Ground
             const ground = new THREE.Mesh(
-                new THREE.PlaneGeometry(20, 20),
+                new THREE.PlaneGeometry(30, 30),
                 new THREE.MeshStandardMaterial({ color: 0xdddddd })
             );
             ground.rotation.x = -Math.PI / 2;
             ground.receiveShadow = true;
             scene.add(ground);
             
-            // Grid
-            scene.add(new THREE.GridHelper(20, 20, 0xcccccc, 0xe0e0e0));
+            // Large grid
+            scene.add(new THREE.GridHelper(30, 30, 0xcccccc, 0xe0e0e0));
             
             // Controls
             controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -211,13 +186,9 @@
             controls.dampingFactor = 0.05;
             controls.target.set(0, 0, 0);
             
-            // Load your friend's GLB (no changes to the file!)
             loadGLB();
-            
-            // Animation loop
             animate();
             
-            // Handle resize
             window.addEventListener('resize', onResize);
         }
 
@@ -225,36 +196,46 @@
             const loader = new THREE.GLTFLoader();
             const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/WareHouseIDTest_05.glb';
             
-            console.log('Loading GLB:', glbUrl);
+            console.log('📦 Loading GLB...');
             updateStatus('Loading model...', 'loading');
             
             loader.load(
                 glbUrl,
                 (gltf) => {
-                    console.log('✅ GLB Loaded');
+                    console.log('✅ GLB Loaded!');
                     updateStatus('Model loaded', 'success');
                     
                     model = gltf.scene;
                     scene.add(model);
                     
-                    // Center model
+                    // Center the entire model
                     const box = new THREE.Box3().setFromObject(model);
                     const center = box.getCenter(new THREE.Vector3());
                     const size = box.getSize(new THREE.Vector3());
+                    
+                    console.log('📐 Model size:', size.x.toFixed(2), 'x', size.y.toFixed(2), 'x', size.z.toFixed(2));
+                    console.log('📍 Model center:', center.x.toFixed(2), center.y.toFixed(2), center.z.toFixed(2));
+                    
+                    // Move to origin but keep above ground
                     model.position.set(-center.x, -center.y + size.y/2, -center.z);
                     
-                    // Extract primitives
+                    // Extract all primitives
                     extractPrimitives();
                     
-                    // Fit camera
-                    fitCamera();
+                    // Save original camera view (full warehouse view)
+                    fitCameraToFullModel();
+                    originalCameraPosition = camera.position.clone();
+                    originalControlsTarget = controls.target.clone();
                     
                     glbLoaded = true;
                     
-                    // Apply pending selection from Power BI
+                    // Apply selection if URL parameter exists
                     if (pendingSelection) {
-                        console.log('Applying pending selection:', pendingSelection);
-                        setTimeout(() => selectContainer(pendingSelection), 100);
+                        console.log('⏳ Pending selection:', pendingSelection);
+                        setTimeout(() => selectContainer(pendingSelection), 200);
+                    } else {
+                        console.log('✅ Showing full warehouse');
+                        updateStatus('Showing all containers', 'info');
                     }
                 },
                 (xhr) => {
@@ -262,8 +243,8 @@
                     console.log(`Loading: ${progress}%`);
                 },
                 (error) => {
-                    console.error('❌ GLB Load Error:', error);
-                    updateStatus('Failed to load model', 'error');
+                    console.error('❌ Error:', error);
+                    updateStatus('Failed to load', 'error');
                 }
             );
         }
@@ -273,6 +254,8 @@
             
             model.traverse((child) => {
                 if (child.isMesh) {
+                    console.log(`🔍 Mesh: ${child.name}`);
+                    
                     if (Array.isArray(child.material)) {
                         child.material.forEach((mat, idx) => {
                             primitives.push({
@@ -282,6 +265,7 @@
                                 materialName: mat.name,
                                 originalMaterial: mat.clone()
                             });
+                            console.log(`  ├─ Primitive ${primitiveIndex}: ${mat.name} [Material ${idx}]`);
                             primitiveIndex++;
                         });
                     } else {
@@ -292,65 +276,62 @@
                             materialName: child.material.name,
                             originalMaterial: child.material.clone()
                         });
+                        console.log(`  └─ Primitive ${primitiveIndex}: ${child.material.name} [Single]`);
                         primitiveIndex++;
                     }
                 }
             });
             
-            console.log(`Extracted ${primitives.length} primitives`);
+            console.log(`✅ Total primitives: ${primitives.length}`);
+            document.getElementById('primitive-count').textContent = primitives.length;
         }
 
         function selectContainer(containerName) {
-            console.log('Selecting:', containerName);
+            console.log('═════════════════════════════');
+            console.log('🎯 SELECT:', containerName);
+            console.log('═════════════════════════════');
             
             if (!glbLoaded) {
-                console.log('GLB not loaded yet, storing selection');
                 pendingSelection = containerName;
                 return;
             }
             
             const containerInfo = CONTAINER_MAP[containerName];
             if (!containerInfo) {
-                console.error('Container not found:', containerName);
+                console.error('❌ Not in CONTAINER_MAP:', containerName);
                 updateStatus('Container not found', 'error');
                 return;
             }
             
-            console.log('Container info:', containerInfo);
+            console.log('✅ Container info:', containerInfo);
             
-            // Find primitive
             const prim = primitives.find(p => p.primitiveID === containerInfo.primitiveID);
             
             if (!prim) {
-                console.error('Primitive not found:', containerInfo.primitiveID);
-                updateStatus('Container mesh not found', 'error');
+                console.error('❌ Primitive not found:', containerInfo.primitiveID);
+                console.log('Available:', primitives.map(p => `P${p.primitiveID}:${p.materialName}`));
+                updateStatus('Primitive not found', 'error');
                 return;
             }
             
-            console.log('Found primitive:', prim);
+            console.log('✅ Found primitive:', prim);
             
-            // Reset all materials (dim others)
+            // Reset all materials to original
             primitives.forEach((p) => {
                 if (p.materialIndex >= 0) {
                     p.mesh.material[p.materialIndex] = p.originalMaterial.clone();
-                    p.mesh.material[p.materialIndex].opacity = 0.3;
-                    p.mesh.material[p.materialIndex].transparent = true;
                 } else {
                     p.mesh.material = p.originalMaterial.clone();
-                    p.mesh.material.opacity = 0.3;
-                    p.mesh.material.transparent = true;
                 }
             });
             
-            // Highlight selected
+            // Highlight the selected one
             const highlightMat = new THREE.MeshStandardMaterial({
                 color: containerInfo.color,
                 emissive: containerInfo.color,
-                emissiveIntensity: 0.6,
-                roughness: 0.2,
-                metalness: 0.7,
-                transparent: false,
-                opacity: 1.0
+                emissiveIntensity: 0.8,
+                roughness: 0.1,
+                metalness: 0.9
             });
             
             if (prim.materialIndex >= 0) {
@@ -359,17 +340,16 @@
                 prim.mesh.material = highlightMat;
             }
             
-            // Focus camera on selected container
+            // Zoom camera to this container
             const box = new THREE.Box3().setFromObject(prim.mesh);
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
-            
             const maxDim = Math.max(size.x, size.y, size.z);
-            const dist = maxDim * 3;
+            const dist = Math.max(maxDim * 3, 6);
             
             camera.position.set(
                 center.x + dist * 0.7,
-                center.y + dist * 0.5,
+                center.y + dist * 0.6,
                 center.z + dist * 0.7
             );
             camera.lookAt(center);
@@ -377,14 +357,38 @@
             
             // Update UI
             document.getElementById('selected-name').textContent = containerName;
-            document.getElementById('selected-status').textContent = containerInfo.status;
             document.getElementById('selected-value').textContent = containerInfo.value;
             updateStatus('Focused on ' + containerName, 'success');
             
             console.log('✅ Selection complete');
         }
 
-        function fitCamera() {
+        function resetView() {
+            console.log('🔄 Resetting to full view');
+            
+            // Reset all materials
+            primitives.forEach((p) => {
+                if (p.materialIndex >= 0) {
+                    p.mesh.material[p.materialIndex] = p.originalMaterial.clone();
+                } else {
+                    p.mesh.material = p.originalMaterial.clone();
+                }
+            });
+            
+            // Restore original camera position
+            if (originalCameraPosition && originalControlsTarget) {
+                camera.position.copy(originalCameraPosition);
+                controls.target.copy(originalControlsTarget);
+            } else {
+                fitCameraToFullModel();
+            }
+            
+            document.getElementById('selected-name').textContent = 'All Containers';
+            document.getElementById('selected-value').textContent = '-';
+            updateStatus('Showing all containers', 'info');
+        }
+
+        function fitCameraToFullModel() {
             if (!model) return;
             
             const box = new THREE.Box3().setFromObject(model);
@@ -393,22 +397,23 @@
             
             const maxDim = Math.max(size.x, size.y, size.z);
             const fov = camera.fov * (Math.PI / 180);
-            const dist = Math.abs(maxDim / Math.tan(fov / 2)) * 1.5;
+            const dist = Math.abs(maxDim / Math.tan(fov / 2)) * 2.0; // 2.0 = zoom out more to see everything
             
             camera.position.set(
                 center.x + dist * 0.7,
-                center.y + dist * 0.5,
+                center.y + dist * 0.6,
                 center.z + dist * 0.7
             );
             camera.lookAt(center);
             controls.target.copy(center);
+            
+            console.log('📷 Camera fitted to full model');
         }
 
         function updateStatus(message, type) {
             const statusDiv = document.getElementById('loading-status');
             statusDiv.textContent = message;
             statusDiv.className = `status-badge status-${type}`;
-            console.log(message);
         }
 
         function animate() {
@@ -424,7 +429,6 @@
             renderer.setSize(container.clientWidth, container.clientHeight);
         }
 
-        // Start everything
         window.addEventListener('load', init);
     </script>
 </body>
