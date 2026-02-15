@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Power BI Dashboard Mockup - Warehouse 3D Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f3f2f1;
+            padding: 20px;
+        }
+        
+        .dashboard {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #0078d4 0%, #106ebe 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .header .date {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 20px;
+            padding: 20px;
+        }
+        
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .filter-panel {
+            background: white;
+            border: 1px solid #e1dfdd;
+            border-radius: 6px;
+            padding: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+        }
+        
+        .filter-panel h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #323130;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .filter-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-radius: 4px;
+            padding-left: 8px;
+        }
+        
+        .filter-item:hover {
+            background: #f3f2f1;
+        }
+        
+        .filter-item input[type="checkbox"] {
+            margin-right: 10px;
+            width: 16px;
+            height: 16px;
+        }
+        
+        .filter-item label {
+            font-size: 13px;
+            color: #323130;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .color-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            border: 2px solid white;
+            box-shadow: 0 0 0 1px #ccc;
+        }
+        
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+        
+        .kpi-card {
+            background: white;
+            border: 1px solid #e1dfdd;
+            border-radius: 6px;
+            padding: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+        }
+        
+        .kpi-card .label {
+            font-size: 11px;
+            color: #605e5c;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        
+        .kpi-card .value {
+            font-size: 28px;
+            font-weight: 600;
+            color: #323130;
+        }
+        
+        .kpi-card .trend {
+            font-size: 12px;
+            color: #107c10;
+            margin-top: 5px;
+        }
+        
+        .viewer-section {
+            background: white;
+            border: 1px solid #e1dfdd;
+            border-radius: 6px;
+            padding: 0;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            height: 500px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .viewer-header {
+            background: #faf9f8;
+            border-bottom: 1px solid #e1dfdd;
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #323130;
+        }
+        
+        .viewer-content {
+            height: calc(100% - 45px);
+            background: #f5f5f5;
+            position: relative;
+        }
+        
+        #viewer-3d {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .viewer-controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            min-width: 220px;
+            z-index: 10;
+        }
+        
+        .viewer-controls h4 {
+            font-size: 13px;
+            margin-bottom: 12px;
+            color: #0078d4;
+            font-weight: 600;
+        }
+        
+        .container-info {
+            font-size: 12px;
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #f3f2f1;
+        }
+        
+        .container-info .info-label {
+            color: #605e5c;
+            font-size: 11px;
+        }
+        
+        .container-info .info-value {
+            color: #323130;
+            font-weight: 600;
+        }
+        
+        .container-buttons {
+            margin-top: 15px;
+        }
+        
+        .container-btn {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #e1dfdd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        
+        .container-btn:hover {
+            background: #f3f2f1;
+            border-color: #0078d4;
+        }
+        
+        .container-btn.active {
+            background: #0078d4;
+            color: white;
+            border-color: #0078d4;
+            font-weight: 600;
+        }
+        
+        .viewer-instructions {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 11px;
+            color: #605e5c;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        
+        .data-section {
+            background: white;
+            border: 1px solid #e1dfdd;
+            border-radius: 6px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+        
+        .data-header {
+            background: #faf9f8;
+            border-bottom: 1px solid #e1dfdd;
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #323130;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        thead {
+            background: #faf9f8;
+        }
+        
+        th {
+            text-align: left;
+            padding: 12px 20px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #605e5c;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #e1dfdd;
+        }
+        
+        td {
+            padding: 12px 20px;
+            font-size: 13px;
+            color: #323130;
+            border-bottom: 1px solid #f3f2f1;
+        }
+        
+        tr:hover {
+            background: #faf9f8;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .status-active {
+            background: #dff6dd;
+            color: #107c10;
+        }
+        
+        .status-maintenance {
+            background: #fff4ce;
+            color: #d83b01;
+        }
+        
+        /* 3D Scene Simulation */
+        .scene-3d {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background: linear-gradient(180deg, #e8e8e8 0%, #f5f5f5 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .warehouse-model {
+            position: relative;
+            width: 400px;
+            height: 300px;
+        }
+        
+        .container-3d {
+            position: absolute;
+            width: 60px;
+            height: 80px;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: all 0.3s;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .container-3d:hover {
+            transform: translateY(-10px) scale(1.1);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
+        
+        .container-3d.active {
+            transform: translateY(-10px) scale(1.15);
+            box-shadow: 0 0 30px currentColor;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 30px currentColor; }
+            50% { box-shadow: 0 0 50px currentColor; }
+        }
+        
+        #c1 { background: #ff6b6b; top: 50px; left: 50px; color: #ff6b6b; }
+        #c2 { background: #4ecdc4; top: 50px; left: 130px; color: #4ecdc4; }
+        #c3 { background: #45b7d1; top: 50px; left: 210px; color: #45b7d1; }
+        #c4 { background: #b088f9; top: 50px; left: 290px; color: #b088f9; }
+        #c5 { background: #00d9ff; top: 150px; left: 170px; color: #00d9ff; }
+        
+        .grid-lines {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        .grid-line-h {
+            position: absolute;
+            width: 100%;
+            height: 1px;
+            background: repeating-linear-gradient(90deg, #999 0px, #999 20px, transparent 20px, transparent 40px);
+        }
+        
+        .grid-line-v {
+            position: absolute;
+            width: 1px;
+            height: 100%;
+            background: repeating-linear-gradient(180deg, #999 0px, #999 20px, transparent 20px, transparent 40px);
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>🏭 Warehouse Management Dashboard</h1>
+            <div class="date">February 14, 2026</div>
+        </div>
+        
+        <div class="content">
+            <!-- Sidebar Filters -->
+            <div class="sidebar">
+                <div class="filter-panel">
+                    <h3>📦 Containers</h3>
+                    <div class="filter-item">
+                        <input type="checkbox" id="f1" checked>
+                        <label for="f1">
+                            <span class="color-dot" style="background: #ff6b6b;"></span>
+                            Container Red
+                        </label>
+                    </div>
+                    <div class="filter-item">
+                        <input type="checkbox" id="f2" checked>
+                        <label for="f2">
+                            <span class="color-dot" style="background: #4ecdc4;"></span>
+                            Container Green
+                        </label>
+                    </div>
+                    <div class="filter-item">
+                        <input type="checkbox" id="f3" checked>
+                        <label for="f3">
+                            <span class="color-dot" style="background: #45b7d1;"></span>
+                            Container Blue
+                        </label>
+                    </div>
+                    <div class="filter-item">
+                        <input type="checkbox" id="f4" checked>
+                        <label for="f4">
+                            <span class="color-dot" style="background: #b088f9;"></span>
+                            Container Purple
+                        </label>
+                    </div>
+                    <div class="filter-item">
+                        <input type="checkbox" id="f5" checked>
+                        <label for="f5">
+                            <span class="color-dot" style="background: #00d9ff;"></span>
+                            Container Cyan
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="filter-panel">
+                    <h3>📍 Location</h3>
+                    <div class="filter-item">
+                        <input type="checkbox" id="z1" checked>
+                        <label for="z1">Zone A</label>
+                    </div>
+                    <div class="filter-item">
+                        <input type="checkbox" id="z2" checked>
+                        <label for="z2">Zone B</label>
+                    </div>
+                    <div class="filter-item">
+                        <input type="checkbox" id="z3" checked>
+                        <label for="z3">Zone C</label>
+                    </div>
+                </div>
+                
+                <div class="filter-panel">
+                    <h3>⚡ Status</h3>
+                    <div class="filter-item">
+                        <input type="checkbox" id="s1" checked>
+                        <label for="s1">Active</label>
+                    </div>
+                    <div class="filter-item">
+                        <input type="checkbox" id="s2">
+                        <label for="s2">Maintenance</label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="main-content">
+                <!-- KPI Cards -->
+                <div class="kpi-row">
+                    <div class="kpi-card">
+                        <div class="label">Total Containers</div>
+                        <div class="value">5</div>
+                        <div class="trend">↑ All Active</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="label">Total Value</div>
+                        <div class="value">1,500</div>
+                        <div class="trend">↑ +12% vs last month</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="label">Average Value</div>
+                        <div class="value">300</div>
+                        <div class="trend">↑ +5% trend</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="label">Active Zones</div>
+                        <div class="value">3</div>
+                        <div class="trend">Zone A, B, C</div>
+                    </div>
+                </div>
+                
+                <!-- 3D Viewer -->
+                <div class="viewer-section">
+                    <div class="viewer-header">
+                        🎯 3D Warehouse Viewer (Interactive)
+                    </div>
+                    <div class="viewer-content">
+                        <div id="viewer-3d"></div>
+                        
+                        <!-- Overlay Controls -->
+                        <div class="viewer-controls">
+                            <h4>📦 Selected Container</h4>
+                            <div class="container-info">
+                                <span class="info-label">Name:</span>
+                                <span class="info-value" id="selected-name">None</span>
+                            </div>
+                            <div class="container-info">
+                                <span class="info-label">GUID:</span>
+                                <span class="info-value" id="selected-guid" style="font-size: 9px;">-</span>
+                            </div>
+                            <div class="container-info">
+                                <span class="info-label">Status:</span>
+                                <span class="info-value" id="selected-status">-</span>
+                            </div>
+                            <div class="container-info">
+                                <span class="info-label">Value:</span>
+                                <span class="info-value" id="selected-value">-</span>
+                            </div>
+                            
+                            <div class="container-buttons">
+                                <button class="container-btn" data-id="1">
+                                    <span class="color-dot" style="background: #ff6b6b;"></span>
+                                    Container 1 (Red)
+                                </button>
+                                <button class="container-btn" data-id="2">
+                                    <span class="color-dot" style="background: #4ecdc4;"></span>
+                                    Container 2 (Green)
+                                </button>
+                                <button class="container-btn" data-id="3">
+                                    <span class="color-dot" style="background: #45b7d1;"></span>
+                                    Container 3 (Blue)
+                                </button>
+                                <button class="container-btn" data-id="4">
+                                    <span class="color-dot" style="background: #b088f9;"></span>
+                                    Container 4 (Purple)
+                                </button>
+                                <button class="container-btn" data-id="5">
+                                    <span class="color-dot" style="background: #00d9ff;"></span>
+                                    Container 5 (Cyan)
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="viewer-instructions">
+                            🖱️ <strong>Controls:</strong> Left-drag: Rotate | Right-drag: Pan | Scroll: Zoom
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Data Table -->
+                <div class="data-section">
+                    <div class="data-header">
+                        📊 Container Details
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Container ID</th>
+                                <th>Name</th>
+                                <th>GUID</th>
+                                <th>Status</th>
+                                <th>Value</th>
+                                <th>Location</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>Container Red</td>
+                                <td style="font-size: 10px; font-family: monospace;">407c48e0-f433-16b9...</td>
+                                <td><span class="status-badge status-active">Active</span></td>
+                                <td>100</td>
+                                <td>Zone A</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>Container Green</td>
+                                <td style="font-size: 10px; font-family: monospace;">a356650-49fa-16cf...</td>
+                                <td><span class="status-badge status-active">Active</span></td>
+                                <td>200</td>
+                                <td>Zone B</td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td>Container Blue</td>
+                                <td style="font-size: 10px; font-family: monospace;">17fc96a0-d7fe-11f0...</td>
+                                <td><span class="status-badge status-active">Active</span></td>
+                                <td>300</td>
+                                <td>Zone C</td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td>Container Purple</td>
+                                <td style="font-size: 10px; font-family: monospace;">022b8f90-e247-11f0...</td>
+                                <td><span class="status-badge status-active">Active</span></td>
+                                <td>400</td>
+                                <td>Zone A</td>
+                            </tr>
+                            <tr>
+                                <td>5</td>
+                                <td>Container Cyan</td>
+                                <td style="font-size: 10px; font-family: monospace;">edf19e580-e24a-11f0...</td>
+                                <td><span class="status-badge status-active">Active</span></td>
+                                <td>500</td>
+                                <td>Zone B</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Container data
+        const containers = [
+            { id: 1, name: 'Red', guid: '407c48e0-f433-16b9-897c-ede17b5e8a37', value: 100, status: 'Active', color: 0xff6b6b },
+            { id: 2, name: 'Green', guid: 'a356650-49fa-16cf-aac7-c5e3b7d4a4f9', value: 200, status: 'Active', color: 0x4ecdc4 },
+            { id: 3, name: 'Blue', guid: '17fc96a0-d7fe-11f0-8ab0-9339546166c3', value: 300, status: 'Active', color: 0x45b7d1 },
+            { id: 4, name: 'Purple', guid: '022b8f90-e247-11f0-aacc-e9f91898e217', value: 400, status: 'Active', color: 0xb088f9 },
+            { id: 5, name: 'Cyan', guid: 'edf19e580-e24a-11f0-aacc-e9f91898e217', value: 500, status: 'Active', color: 0x00d9ff }
+        ];
+
+        let scene, camera, renderer, controls;
+        let containerMeshes = [];
+        let selectedContainer = null;
+
+        function init3DViewer() {
+            const container = document.getElementById('viewer-3d');
+            
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf5f5f5);
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(6, 5, 6);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+            
+            // Lights
+            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            dirLight.position.set(10, 10, 5);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+            
+            // Ground
+            const ground = new THREE.Mesh(
+                new THREE.PlaneGeometry(20, 20),
+                new THREE.MeshStandardMaterial({ color: 0xdddddd })
+            );
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+            
+            // Grid
+            scene.add(new THREE.GridHelper(20, 20, 0xcccccc, 0xe0e0e0));
+            
+            // Create container boxes
+            const positions = [
+                { x: -3, z: -2 },  // Red
+                { x: -1, z: -2 },  // Green
+                { x: 1, z: -2 },   // Blue
+                { x: 3, z: -2 },   // Purple
+                { x: 0, z: 0.5 }   // Cyan
+            ];
+            
+            containers.forEach((container, i) => {
+                const geometry = new THREE.BoxGeometry(1.2, 1.5, 1);
+                const material = new THREE.MeshStandardMaterial({
+                    color: container.color,
+                    roughness: 0.4,
+                    metalness: 0.3
+                });
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.set(positions[i].x, 0.75, positions[i].z);
+                mesh.castShadow = true;
+                mesh.userData = { id: container.id };
+                scene.add(mesh);
+                containerMeshes.push({ id: container.id, mesh, originalMaterial: material.clone() });
+            });
+            
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.target.set(0, 0, 0);
+            
+            // Handle resize
+            window.addEventListener('resize', () => {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            });
+            
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function selectContainer(id) {
+            const container = containers.find(c => c.id === id);
+            if (!container) return;
+            
+            // Reset previous selection
+            if (selectedContainer) {
+                const prevMesh = containerMeshes.find(m => m.id === selectedContainer);
+                if (prevMesh) {
+                    prevMesh.mesh.material = prevMesh.originalMaterial.clone();
+                }
+            }
+            
+            // Highlight new selection
+            const mesh = containerMeshes.find(m => m.id === id);
+            if (mesh) {
+                mesh.mesh.material = new THREE.MeshStandardMaterial({
+                    color: container.color,
+                    emissive: container.color,
+                    emissiveIntensity: 0.6,
+                    roughness: 0.2,
+                    metalness: 0.7
+                });
+            }
+            
+            selectedContainer = id;
+            
+            // Update UI
+            document.getElementById('selected-name').textContent = `Container ${container.name}`;
+            document.getElementById('selected-guid').textContent = container.guid.substring(0, 24) + '...';
+            document.getElementById('selected-status').textContent = container.status;
+            document.getElementById('selected-value').textContent = container.value;
+            
+            // Update buttons
+            document.querySelectorAll('.container-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.id == id);
+            });
+        }
+
+        // Initialize
+        window.addEventListener('load', () => {
+            init3DViewer();
+            
+            // Button clicks
+            document.querySelectorAll('.container-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    selectContainer(parseInt(btn.dataset.id));
+                });
+            });
+            
+            // Auto-select first container
+            setTimeout(() => selectContainer(1), 500);
+        });
+    </script>
+</body>
+</html>
