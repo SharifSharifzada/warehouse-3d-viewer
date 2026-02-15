@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>3D Warehouse Viewer - Simple Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        #status {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 2px solid #0078d4;
+        }
+        #viewer {
+            width: 100%;
+            height: 600px;
+            background: #e0e0e0;
+            border-radius: 8px;
+            position: relative;
+        }
+        .log {
+            padding: 5px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+    <h1>🔍 3D Warehouse Viewer - Diagnostic Test</h1>
+    <div id="status">
+        <h3>Status Log:</h3>
+        <div id="log"></div>
+    </div>
+    <div id="viewer"></div>
+
+    <script>
+        const log = (message, type = 'info') => {
+            const div = document.createElement('div');
+            div.className = `log ${type}`;
+            div.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            document.getElementById('log').appendChild(div);
+            console.log(message);
+        };
+
+        log('🚀 Starting 3D viewer initialization...', 'info');
+
+        // Check if Three.js loaded
+        if (typeof THREE === 'undefined') {
+            log('❌ Three.js failed to load!', 'error');
+        } else {
+            log('✅ Three.js loaded successfully', 'success');
+        }
+
+        // Check if GLTFLoader loaded
+        if (typeof THREE.GLTFLoader === 'undefined') {
+            log('❌ GLTFLoader failed to load!', 'error');
+        } else {
+            log('✅ GLTFLoader loaded successfully', 'success');
+        }
+
+        // Check if OrbitControls loaded
+        if (typeof THREE.OrbitControls === 'undefined') {
+            log('❌ OrbitControls failed to load!', 'error');
+        } else {
+            log('✅ OrbitControls loaded successfully', 'success');
+        }
+
+        let scene, camera, renderer, controls;
+
+        function init() {
+            log('📐 Initializing 3D scene...', 'info');
+            
+            const container = document.getElementById('viewer');
+            
+            try {
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0xf5f5f5);
+                log('✅ Scene created', 'success');
+                
+                camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
+                camera.position.set(8, 6, 8);
+                log('✅ Camera created', 'success');
+                
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(container.clientWidth, container.clientHeight);
+                container.appendChild(renderer.domElement);
+                log('✅ Renderer created and added to DOM', 'success');
+                
+                // Add lights
+                scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+                const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+                dirLight.position.set(10, 15, 10);
+                scene.add(dirLight);
+                log('✅ Lights added', 'success');
+                
+                // Add ground
+                const ground = new THREE.Mesh(
+                    new THREE.PlaneGeometry(50, 50),
+                    new THREE.MeshStandardMaterial({ color: 0xe0e0e0 })
+                );
+                ground.rotation.x = -Math.PI / 2;
+                scene.add(ground);
+                log('✅ Ground added', 'success');
+                
+                // Add grid
+                scene.add(new THREE.GridHelper(20, 20, 0xcccccc, 0xe8e8e8));
+                log('✅ Grid added', 'success');
+                
+                // Controls
+                controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.05;
+                log('✅ Controls initialized', 'success');
+                
+                animate();
+                log('✅ Animation loop started', 'success');
+                
+                // Now try to load GLB
+                loadGLB();
+                
+            } catch (error) {
+                log(`❌ Error during initialization: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+
+        function loadGLB() {
+            log('📦 Starting GLB load...', 'info');
+            
+            const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/WareHouseIDTest_05.glb';
+            log(`🔗 GLB URL: ${glbUrl}`, 'info');
+            
+            const loader = new THREE.GLTFLoader();
+            
+            loader.load(
+                glbUrl,
+                (gltf) => {
+                    log('✅ GLB file loaded successfully!', 'success');
+                    
+                    const model = gltf.scene;
+                    scene.add(model);
+                    log('✅ Model added to scene', 'success');
+                    
+                    // Center model
+                    const box = new THREE.Box3().setFromObject(model);
+                    const center = box.getCenter(new THREE.Vector3());
+                    const size = box.getSize(new THREE.Vector3());
+                    model.position.sub(center);
+                    log(`✅ Model centered. Size: ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}`, 'success');
+                    
+                    // Count primitives
+                    let primitiveCount = 0;
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            if (Array.isArray(child.material)) {
+                                primitiveCount += child.material.length;
+                            } else {
+                                primitiveCount++;
+                            }
+                        }
+                    });
+                    log(`✅ Found ${primitiveCount} primitives/materials in model`, 'success');
+                    
+                    // Adjust camera
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    const fov = camera.fov * (Math.PI / 180);
+                    const cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 2;
+                    camera.position.set(cameraZ, cameraZ * 0.7, cameraZ);
+                    camera.lookAt(0, 0, 0);
+                    controls.update();
+                    log('✅ Camera adjusted to view model', 'success');
+                },
+                (xhr) => {
+                    const progress = (xhr.loaded / xhr.total * 100).toFixed(0);
+                    log(`⏳ Loading GLB: ${progress}%`, 'info');
+                },
+                (error) => {
+                    log(`❌ GLB loading error: ${error.message || error}`, 'error');
+                    console.error('Full error:', error);
+                    
+                    // Create fallback boxes
+                    log('🔄 Creating fallback colored boxes...', 'info');
+                    createFallbackBoxes();
+                }
+            );
+        }
+
+        function createFallbackBoxes() {
+            const colors = [0xff6b6b, 0x4ecdc4, 0x45b7d1, 0xb088f9, 0x00d9ff];
+            const positions = [
+                { x: -3, z: -2 },
+                { x: -1, z: -2 },
+                { x: 1, z: -2 },
+                { x: 3, z: -2 },
+                { x: 0, z: 0.5 }
+            ];
+            
+            colors.forEach((color, i) => {
+                const geometry = new THREE.BoxGeometry(1.2, 1.5, 1);
+                const material = new THREE.MeshStandardMaterial({
+                    color: color,
+                    roughness: 0.4,
+                    metalness: 0.3
+                });
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.set(positions[i].x, 0.75, positions[i].z);
+                scene.add(mesh);
+            });
+            
+            log('✅ Fallback boxes created', 'success');
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Start when page loads
+        window.addEventListener('load', () => {
+            log('📄 Page loaded, initializing...', 'info');
+            init();
+        });
+
+        // Log any window errors
+        window.addEventListener('error', (e) => {
+            log(`❌ Window error: ${e.message}`, 'error');
+        });
+    </script>
+</body>
+</html>
