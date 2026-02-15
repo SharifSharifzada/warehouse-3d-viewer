@@ -2,117 +2,22 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Warehouse 3D Viewer - Auto-Detect</title>
+    <title>Warehouse 3D Viewer</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; background: #f5f5f5; overflow: hidden; }
-        
-        #viewer-container { width: 100vw; height: 100vh; position: relative; }
-        #viewer { width: 100%; height: 100%; }
-        
-        .info-overlay {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            background: rgba(255, 255, 255, 0.98);
-            padding: 15px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-            z-index: 1000;
-            min-width: 350px;
-            max-height: 90vh;
-            overflow-y: auto;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
         
-        .info-overlay h3 {
-            font-size: 16px;
-            color: #0078d4;
-            margin-bottom: 12px;
-            font-weight: 600;
-            border-bottom: 2px solid #0078d4;
-            padding-bottom: 8px;
+        body {
+            overflow: hidden;
+            background: #f5f5f5;
         }
         
-        .info-section {
-            margin: 15px 0;
-            padding: 10px;
-            background: #f8f8f8;
-            border-radius: 5px;
-            border-left: 3px solid #0078d4;
-        }
-        
-        .info-section h4 {
-            font-size: 13px;
-            color: #333;
-            margin-bottom: 8px;
-        }
-        
-        .primitive-item {
-            padding: 8px;
-            margin: 5px 0;
-            background: white;
-            border-radius: 4px;
-            font-size: 11px;
-            border: 1px solid #ddd;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .primitive-item:hover {
-            border-color: #0078d4;
-            box-shadow: 0 2px 8px rgba(0,120,212,0.2);
-        }
-        
-        .primitive-item.active {
-            border-color: #0078d4;
-            background: #e6f2ff;
-            font-weight: bold;
-        }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-            margin: 5px 5px 5px 0;
-        }
-        
-        .status-success { background: #dff6dd; color: #107c10; }
-        .status-error { background: #f8d7da; color: #721c24; }
-        .status-warning { background: #fff4ce; color: #856404; }
-        .status-info { background: #d1ecf1; color: #0c5460; }
-        
-        .mapping-code {
-            background: #1e1e1e;
-            color: #d4d4d4;
-            padding: 12px;
-            border-radius: 5px;
-            font-family: 'Courier New', monospace;
-            font-size: 10px;
-            overflow-x: auto;
-            margin-top: 10px;
-        }
-        
-        .mapping-code .keyword { color: #569cd6; }
-        .mapping-code .string { color: #ce9178; }
-        .mapping-code .number { color: #b5cea8; }
-        
-        button {
-            background: #0078d4;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            font-size: 12px;
-            cursor: pointer;
-            margin: 5px 5px 5px 0;
-            transition: all 0.2s;
-        }
-        
-        button:hover {
-            background: #106ebe;
-            box-shadow: 0 2px 8px rgba(0,120,212,0.3);
+        #viewer {
+            width: 100vw;
+            height: 100vh;
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -120,62 +25,30 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
-    <div id="viewer-container">
-        <div id="viewer"></div>
-        
-        <div class="info-overlay">
-            <h3>🔍 Auto-Detect & Fix</h3>
-            
-            <div class="info-section">
-                <h4>📦 URL Parameter</h4>
-                <div class="status-badge status-info" id="url-param">None</div>
-            </div>
-            
-            <div class="info-section">
-                <h4>✅ Primitives Found in GLB</h4>
-                <div id="primitives-found">Loading...</div>
-            </div>
-            
-            <div class="info-section">
-                <h4>🎨 Click to Highlight Each Primitive</h4>
-                <div id="primitives-list"></div>
-            </div>
-            
-            <div class="info-section">
-                <h4>🔧 Fixed Mapping Code</h4>
-                <div class="status-badge status-success">Copy this code!</div>
-                <div class="mapping-code" id="mapping-code">Loading...</div>
-                <button onclick="copyMapping()">📋 Copy to Clipboard</button>
-            </div>
-        </div>
-    </div>
+    <div id="viewer"></div>
 
     <script>
-        // CSV Data - What you WANT to map to
-        const CSV_CONTAINERS = [
-            { name: 'Container_Red', csvPrimitiveID: 0, materialName: 'test1', color: 0xff0000 },
-            { name: 'Container_Green', csvPrimitiveID: 1, materialName: 'test2', color: 0x00ff00 },
-            { name: 'Container_Blue', csvPrimitiveID: 2, materialName: 'test3', color: 0x0000ff },
-            { name: 'Container_Purple', csvPrimitiveID: 3, materialName: 'test', color: 0x800080 },
-            { name: 'Container_Cyan', csvPrimitiveID: 4, materialName: 'test', color: 0x00ffff }
-        ];
+        // Container mapping - adjust based on your GLB structure
+        const CONTAINER_MAP = {
+            'Container_Red': { primitiveID: 0, color: 0xff0000 },
+            'Container_Green': { primitiveID: 1, color: 0x00ff00 },
+            'Container_Blue': { primitiveID: 2, color: 0x0000ff },
+            'Container_Purple': { primitiveID: 3, color: 0x800080 },
+            'Container_Cyan': { primitiveID: 4, color: 0x00ffff }
+        };
 
-        // Get URL parameter
         function getURLParameter(name) {
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get(name);
         }
 
         const urlSelectedContainer = getURLParameter('container');
-        if (urlSelectedContainer) {
-            document.getElementById('url-param').textContent = urlSelectedContainer;
-        }
+        console.log('Selected:', urlSelectedContainer);
 
         let scene, camera, renderer, controls;
-        let model = null;
-        let primitives = [];
+        let model, primitives = [];
         let glbLoaded = false;
-        let selectedPrimitiveID = null;
+        let pendingSelection = urlSelectedContainer;
 
         function init() {
             const container = document.getElementById('viewer');
@@ -183,29 +56,38 @@
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xf5f5f5);
             
-            camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
-            camera.position.set(8, 6, 8);
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(10, 8, 10);
             
             renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
             container.appendChild(renderer.domElement);
             
-            scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+            // Lighting
+            scene.add(new THREE.AmbientLight(0xffffff, 0.9));
             const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
             dirLight1.position.set(10, 10, 5);
             scene.add(dirLight1);
+            const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+            dirLight2.position.set(-10, 5, -10);
+            scene.add(dirLight2);
             
+            // Ground
             const ground = new THREE.Mesh(
-                new THREE.PlaneGeometry(20, 20),
+                new THREE.PlaneGeometry(30, 30),
                 new THREE.MeshStandardMaterial({ color: 0xdddddd })
             );
             ground.rotation.x = -Math.PI / 2;
             scene.add(ground);
             
-            scene.add(new THREE.GridHelper(20, 20, 0xcccccc, 0xe0e0e0));
+            // Grid
+            scene.add(new THREE.GridHelper(30, 30, 0xcccccc, 0xe0e0e0));
             
+            // Controls
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
             
             loadGLB();
             animate();
@@ -217,118 +99,90 @@
             const loader = new THREE.GLTFLoader();
             const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/WareHouseIDTest_05.glb';
             
-            console.log('Loading:', glbUrl);
-            
             loader.load(
                 glbUrl,
                 (gltf) => {
-                    console.log('✅ GLB Loaded');
-                    
                     model = gltf.scene;
                     scene.add(model);
                     
+                    // Center model
                     const box = new THREE.Box3().setFromObject(model);
                     const center = box.getCenter(new THREE.Vector3());
                     const size = box.getSize(new THREE.Vector3());
                     model.position.set(-center.x, -center.y + size.y/2, -center.z);
                     
-                    extractPrimitives();
+                    // Extract primitives
+                    let primitiveIndex = 0;
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            if (Array.isArray(child.material)) {
+                                child.material.forEach((mat, idx) => {
+                                    primitives.push({
+                                        primitiveID: primitiveIndex,
+                                        mesh: child,
+                                        materialIndex: idx,
+                                        originalMaterial: mat.clone()
+                                    });
+                                    primitiveIndex++;
+                                });
+                            } else {
+                                primitives.push({
+                                    primitiveID: primitiveIndex,
+                                    mesh: child,
+                                    materialIndex: -1,
+                                    originalMaterial: child.material.clone()
+                                });
+                                primitiveIndex++;
+                            }
+                        }
+                    });
+                    
+                    console.log('Primitives found:', primitives.length);
+                    
+                    // Fit camera to full model
                     fitCamera();
                     
                     glbLoaded = true;
-                    generateMapping();
                     
-                    // Auto-select if URL parameter exists
-                    if (urlSelectedContainer) {
-                        setTimeout(() => autoSelect(urlSelectedContainer), 300);
+                    // Apply selection
+                    if (pendingSelection) {
+                        setTimeout(() => selectContainer(pendingSelection), 200);
                     }
-                },
-                null,
-                (error) => {
-                    console.error('❌ Error:', error);
-                    document.getElementById('primitives-found').innerHTML = '<span class="status-badge status-error">Failed to load GLB</span>';
                 }
             );
         }
 
-        function extractPrimitives() {
-            let primitiveIndex = 0;
+        function selectContainer(containerName) {
+            if (!glbLoaded) {
+                pendingSelection = containerName;
+                return;
+            }
             
-            model.traverse((child) => {
-                if (child.isMesh) {
-                    if (Array.isArray(child.material)) {
-                        child.material.forEach((mat, idx) => {
-                            primitives.push({
-                                primitiveID: primitiveIndex,
-                                mesh: child,
-                                materialIndex: idx,
-                                materialName: mat.name || 'Unnamed',
-                                meshName: child.name || 'Unnamed',
-                                originalMaterial: mat.clone(),
-                                color: mat.color ? mat.color.getHex() : 0xcccccc
-                            });
-                            primitiveIndex++;
-                        });
-                    } else {
-                        primitives.push({
-                            primitiveID: primitiveIndex,
-                            mesh: child,
-                            materialIndex: -1,
-                            materialName: child.material.name || 'Unnamed',
-                            meshName: child.name || 'Unnamed',
-                            originalMaterial: child.material.clone(),
-                            color: child.material.color ? child.material.color.getHex() : 0xcccccc
-                        });
-                        primitiveIndex++;
-                    }
-                }
-            });
+            const containerInfo = CONTAINER_MAP[containerName];
+            if (!containerInfo) return;
             
-            console.log(`Found ${primitives.length} primitives`);
-            displayPrimitives();
-        }
-
-        function displayPrimitives() {
-            const foundDiv = document.getElementById('primitives-found');
-            foundDiv.innerHTML = `<span class="status-badge status-success">${primitives.length} Primitives</span>`;
+            const prim = primitives.find(p => p.primitiveID === containerInfo.primitiveID);
+            if (!prim) {
+                console.error('Primitive not found:', containerInfo.primitiveID);
+                return;
+            }
             
-            const listDiv = document.getElementById('primitives-list');
-            listDiv.innerHTML = '';
-            
-            primitives.forEach((prim) => {
-                const div = document.createElement('div');
-                div.className = 'primitive-item';
-                div.innerHTML = `
-                    <strong>Primitive ${prim.primitiveID}</strong><br>
-                    Material: ${prim.materialName}<br>
-                    Mesh: ${prim.meshName}<br>
-                    <span style="color: #${prim.color.toString(16).padStart(6, '0')}">●</span> Color: #${prim.color.toString(16).padStart(6, '0')}
-                `;
-                div.onclick = () => highlightPrimitive(prim.primitiveID);
-                listDiv.appendChild(div);
-            });
-        }
-
-        function highlightPrimitive(primitiveID) {
-            console.log('Highlighting Primitive:', primitiveID);
-            
-            // Reset all
-            primitives.forEach((prim) => {
-                if (prim.materialIndex >= 0) {
-                    prim.mesh.material[prim.materialIndex] = prim.originalMaterial.clone();
+            // Reset all materials
+            primitives.forEach((p) => {
+                if (p.materialIndex >= 0) {
+                    p.mesh.material[p.materialIndex] = p.originalMaterial.clone();
                 } else {
-                    prim.mesh.material = prim.originalMaterial.clone();
+                    p.mesh.material = p.originalMaterial.clone();
                 }
             });
             
             // Highlight selected
-            const prim = primitives[primitiveID];
             const highlightMat = new THREE.MeshStandardMaterial({
-                color: 0xffff00,
-                emissive: 0xffff00,
-                emissiveIntensity: 1.0,
-                roughness: 0.2,
-                metalness: 0.8
+                color: containerInfo.color,
+                emissive: containerInfo.color,
+                emissiveIntensity: 0.8,
+                roughness: 0.1,
+                metalness: 0.9
             });
             
             if (prim.materialIndex >= 0) {
@@ -337,54 +191,20 @@
                 prim.mesh.material = highlightMat;
             }
             
-            // Focus camera
+            // Zoom to selected
             const box = new THREE.Box3().setFromObject(prim.mesh);
             const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const dist = Math.max(maxDim * 3, 6);
+            
+            camera.position.set(
+                center.x + dist * 0.7,
+                center.y + dist * 0.6,
+                center.z + dist * 0.7
+            );
             camera.lookAt(center);
             controls.target.copy(center);
-            
-            // Update UI
-            document.querySelectorAll('.primitive-item').forEach((el, idx) => {
-                el.classList.toggle('active', idx === primitiveID);
-            });
-            
-            selectedPrimitiveID = primitiveID;
-        }
-
-        function generateMapping() {
-            let mappingHTML = '<span class="keyword">const</span> CONTAINER_MAP = {<br>';
-            
-            // Try to auto-match by material name
-            CSV_CONTAINERS.forEach((container, idx) => {
-                const matchingPrim = primitives.find(p => p.materialName === container.materialName);
-                
-                if (matchingPrim) {
-                    mappingHTML += `&nbsp;&nbsp;<span class="string">'${container.name}'</span>: { id: ${idx + 1}, primitiveID: <span class="number">${matchingPrim.primitiveID}</span>, color: <span class="number">0x${container.color.toString(16)}</span> },<br>`;
-                } else {
-                    mappingHTML += `&nbsp;&nbsp;<span class="string">'${container.name}'</span>: { id: ${idx + 1}, primitiveID: <span class="number">???</span>, color: <span class="number">0x${container.color.toString(16)}</span> }, // ❌ NOT FOUND<br>`;
-                }
-            });
-            
-            mappingHTML += '};';
-            
-            document.getElementById('mapping-code').innerHTML = mappingHTML;
-        }
-
-        function autoSelect(containerName) {
-            console.log('Auto-selecting:', containerName);
-            const container = CSV_CONTAINERS.find(c => c.name === containerName);
-            if (!container) return;
-            
-            const matchingPrim = primitives.find(p => p.materialName === container.materialName);
-            if (matchingPrim) {
-                highlightPrimitive(matchingPrim.primitiveID);
-            }
-        }
-
-        function copyMapping() {
-            const text = document.getElementById('mapping-code').textContent;
-            navigator.clipboard.writeText(text);
-            alert('✅ Mapping code copied to clipboard!');
         }
 
         function fitCamera() {
@@ -393,8 +213,13 @@
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z);
-            const dist = maxDim * 2;
-            camera.position.set(center.x + dist, center.y + dist * 0.7, center.z + dist);
+            const fov = camera.fov * (Math.PI / 180);
+            const dist = Math.abs(maxDim / Math.tan(fov / 2)) * 2.0;
+            camera.position.set(
+                center.x + dist * 0.7,
+                center.y + dist * 0.6,
+                center.z + dist * 0.7
+            );
             camera.lookAt(center);
             controls.target.copy(center);
         }
@@ -406,10 +231,9 @@
         }
 
         function onResize() {
-            const container = document.getElementById('viewer');
-            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
-            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
         window.addEventListener('load', init);
