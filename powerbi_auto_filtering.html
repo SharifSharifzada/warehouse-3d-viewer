@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Warehouse 3D Viewer - Complete</title>
+    <title>Warehouse 3D Viewer - Auto-Detect</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: #f5f5f5; overflow: hidden; }
@@ -14,71 +14,105 @@
             position: absolute;
             top: 15px;
             left: 15px;
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.98);
             padding: 15px 20px;
             border-radius: 8px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
             z-index: 1000;
-            min-width: 280px;
+            min-width: 350px;
+            max-height: 90vh;
+            overflow-y: auto;
         }
         
         .info-overlay h3 {
-            font-size: 14px;
+            font-size: 16px;
             color: #0078d4;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             font-weight: 600;
+            border-bottom: 2px solid #0078d4;
+            padding-bottom: 8px;
         }
         
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 5px 0;
-            font-size: 12px;
-            border-bottom: 1px solid #f0f0f0;
+        .info-section {
+            margin: 15px 0;
+            padding: 10px;
+            background: #f8f8f8;
+            border-radius: 5px;
+            border-left: 3px solid #0078d4;
         }
         
-        .info-label { color: #666; font-weight: 500; }
-        .info-value { color: #333; font-weight: 600; }
+        .info-section h4 {
+            font-size: 13px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .primitive-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 4px;
+            font-size: 11px;
+            border: 1px solid #ddd;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .primitive-item:hover {
+            border-color: #0078d4;
+            box-shadow: 0 2px 8px rgba(0,120,212,0.2);
+        }
+        
+        .primitive-item.active {
+            border-color: #0078d4;
+            background: #e6f2ff;
+            font-weight: bold;
+        }
         
         .status-badge {
             display: inline-block;
-            padding: 6px 14px;
+            padding: 6px 12px;
             border-radius: 12px;
             font-size: 11px;
             font-weight: 600;
-            margin-top: 8px;
+            margin: 5px 5px 5px 0;
         }
         
-        .status-loading { background: #fff4ce; color: #8a6d3b; }
         .status-success { background: #dff6dd; color: #107c10; }
         .status-error { background: #f8d7da; color: #721c24; }
+        .status-warning { background: #fff4ce; color: #856404; }
         .status-info { background: #d1ecf1; color: #0c5460; }
         
-        .controls-hint {
-            position: absolute;
-            bottom: 15px;
-            right: 15px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 8px 15px;
-            border-radius: 6px;
-            font-size: 11px;
-            color: #666;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        .mapping-code {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 12px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            overflow-x: auto;
+            margin-top: 10px;
         }
-
+        
+        .mapping-code .keyword { color: #569cd6; }
+        .mapping-code .string { color: #ce9178; }
+        .mapping-code .number { color: #b5cea8; }
+        
         button {
             background: #0078d4;
             color: white;
             border: none;
-            padding: 6px 12px;
+            padding: 8px 16px;
             border-radius: 4px;
-            font-size: 11px;
+            font-size: 12px;
             cursor: pointer;
-            margin-top: 8px;
+            margin: 5px 5px 5px 0;
+            transition: all 0.2s;
         }
-
+        
         button:hover {
             background: #106ebe;
+            box-shadow: 0 2px 8px rgba(0,120,212,0.3);
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -90,54 +124,58 @@
         <div id="viewer"></div>
         
         <div class="info-overlay">
-            <h3>🏭 Warehouse Viewer</h3>
-            <div class="info-row">
-                <span class="info-label">Selection:</span>
-                <span class="info-value" id="selected-name">All Containers</span>
+            <h3>🔍 Auto-Detect & Fix</h3>
+            
+            <div class="info-section">
+                <h4>📦 URL Parameter</h4>
+                <div class="status-badge status-info" id="url-param">None</div>
             </div>
-            <div class="info-row">
-                <span class="info-label">Primitives:</span>
-                <span class="info-value" id="primitive-count">Loading...</span>
+            
+            <div class="info-section">
+                <h4>✅ Primitives Found in GLB</h4>
+                <div id="primitives-found">Loading...</div>
             </div>
-            <div class="info-row">
-                <span class="info-label">Value:</span>
-                <span class="info-value" id="selected-value">-</span>
+            
+            <div class="info-section">
+                <h4>🎨 Click to Highlight Each Primitive</h4>
+                <div id="primitives-list"></div>
             </div>
-            <div id="loading-status" class="status-badge status-loading">Loading...</div>
-            <button onclick="resetView()">🔄 Reset View</button>
-        </div>
-        
-        <div class="controls-hint">
-            🖱️ Drag to rotate • Right-click to pan • Scroll to zoom
+            
+            <div class="info-section">
+                <h4>🔧 Fixed Mapping Code</h4>
+                <div class="status-badge status-success">Copy this code!</div>
+                <div class="mapping-code" id="mapping-code">Loading...</div>
+                <button onclick="copyMapping()">📋 Copy to Clipboard</button>
+            </div>
         </div>
     </div>
 
     <script>
-        // MANUAL MAPPING - You need to tell us which primitive = which container
-        // We'll auto-detect after you test, but for now:
-        const CONTAINER_MAP = {
-            'Container_Red': { primitiveID: 0, color: 0xff0000, value: 100 },      // You confirmed this works
-            'Container_Green': { primitiveID: 1, color: 0x00ff00, value: 200 },    // Needs verification
-            'Container_Blue': { primitiveID: 2, color: 0x0000ff, value: 300 },     // You confirmed this works
-            'Container_Purple': { primitiveID: 3, color: 0x800080, value: 400 },   // Needs verification
-            'Container_Cyan': { primitiveID: 4, color: 0x00ffff, value: 500 }      // Needs verification
-        };
+        // CSV Data - What you WANT to map to
+        const CSV_CONTAINERS = [
+            { name: 'Container_Red', csvPrimitiveID: 0, materialName: 'test1', color: 0xff0000 },
+            { name: 'Container_Green', csvPrimitiveID: 1, materialName: 'test2', color: 0x00ff00 },
+            { name: 'Container_Blue', csvPrimitiveID: 2, materialName: 'test3', color: 0x0000ff },
+            { name: 'Container_Purple', csvPrimitiveID: 3, materialName: 'test', color: 0x800080 },
+            { name: 'Container_Cyan', csvPrimitiveID: 4, materialName: 'test', color: 0x00ffff }
+        ];
 
+        // Get URL parameter
         function getURLParameter(name) {
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get(name);
         }
 
         const urlSelectedContainer = getURLParameter('container');
-        console.log('📍 URL Parameter:', urlSelectedContainer);
+        if (urlSelectedContainer) {
+            document.getElementById('url-param').textContent = urlSelectedContainer;
+        }
 
         let scene, camera, renderer, controls;
         let model = null;
         let primitives = [];
         let glbLoaded = false;
-        let pendingSelection = urlSelectedContainer;
-        let originalCameraPosition = null;
-        let originalControlsTarget = null;
+        let selectedPrimitiveID = null;
 
         function init() {
             const container = document.getElementById('viewer');
@@ -146,45 +184,28 @@
             scene.background = new THREE.Color(0xf5f5f5);
             
             camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
-            camera.position.set(10, 8, 10);
+            camera.position.set(8, 6, 8);
             
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(container.clientWidth, container.clientHeight);
-            renderer.shadowMap.enabled = true;
             container.appendChild(renderer.domElement);
             
-            // BRIGHT LIGHTING to see everything
-            scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-            
+            scene.add(new THREE.AmbientLight(0xffffff, 0.8));
             const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
             dirLight1.position.set(10, 10, 5);
             scene.add(dirLight1);
             
-            const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
-            dirLight2.position.set(-10, 5, -10);
-            scene.add(dirLight2);
-            
-            const dirLight3 = new THREE.DirectionalLight(0xffffff, 0.3);
-            dirLight3.position.set(0, -5, 0);
-            scene.add(dirLight3);
-            
-            // Ground
             const ground = new THREE.Mesh(
-                new THREE.PlaneGeometry(30, 30),
+                new THREE.PlaneGeometry(20, 20),
                 new THREE.MeshStandardMaterial({ color: 0xdddddd })
             );
             ground.rotation.x = -Math.PI / 2;
-            ground.receiveShadow = true;
             scene.add(ground);
             
-            // Large grid
-            scene.add(new THREE.GridHelper(30, 30, 0xcccccc, 0xe0e0e0));
+            scene.add(new THREE.GridHelper(20, 20, 0xcccccc, 0xe0e0e0));
             
-            // Controls
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-            controls.target.set(0, 0, 0);
             
             loadGLB();
             animate();
@@ -196,55 +217,36 @@
             const loader = new THREE.GLTFLoader();
             const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/WareHouseIDTest_05.glb';
             
-            console.log('📦 Loading GLB...');
-            updateStatus('Loading model...', 'loading');
+            console.log('Loading:', glbUrl);
             
             loader.load(
                 glbUrl,
                 (gltf) => {
-                    console.log('✅ GLB Loaded!');
-                    updateStatus('Model loaded', 'success');
+                    console.log('✅ GLB Loaded');
                     
                     model = gltf.scene;
                     scene.add(model);
                     
-                    // Center the entire model
                     const box = new THREE.Box3().setFromObject(model);
                     const center = box.getCenter(new THREE.Vector3());
                     const size = box.getSize(new THREE.Vector3());
-                    
-                    console.log('📐 Model size:', size.x.toFixed(2), 'x', size.y.toFixed(2), 'x', size.z.toFixed(2));
-                    console.log('📍 Model center:', center.x.toFixed(2), center.y.toFixed(2), center.z.toFixed(2));
-                    
-                    // Move to origin but keep above ground
                     model.position.set(-center.x, -center.y + size.y/2, -center.z);
                     
-                    // Extract all primitives
                     extractPrimitives();
-                    
-                    // Save original camera view (full warehouse view)
-                    fitCameraToFullModel();
-                    originalCameraPosition = camera.position.clone();
-                    originalControlsTarget = controls.target.clone();
+                    fitCamera();
                     
                     glbLoaded = true;
+                    generateMapping();
                     
-                    // Apply selection if URL parameter exists
-                    if (pendingSelection) {
-                        console.log('⏳ Pending selection:', pendingSelection);
-                        setTimeout(() => selectContainer(pendingSelection), 200);
-                    } else {
-                        console.log('✅ Showing full warehouse');
-                        updateStatus('Showing all containers', 'info');
+                    // Auto-select if URL parameter exists
+                    if (urlSelectedContainer) {
+                        setTimeout(() => autoSelect(urlSelectedContainer), 300);
                     }
                 },
-                (xhr) => {
-                    const progress = (xhr.loaded / xhr.total * 100).toFixed(0);
-                    console.log(`Loading: ${progress}%`);
-                },
+                null,
                 (error) => {
                     console.error('❌ Error:', error);
-                    updateStatus('Failed to load', 'error');
+                    document.getElementById('primitives-found').innerHTML = '<span class="status-badge status-error">Failed to load GLB</span>';
                 }
             );
         }
@@ -254,18 +256,17 @@
             
             model.traverse((child) => {
                 if (child.isMesh) {
-                    console.log(`🔍 Mesh: ${child.name}`);
-                    
                     if (Array.isArray(child.material)) {
                         child.material.forEach((mat, idx) => {
                             primitives.push({
                                 primitiveID: primitiveIndex,
                                 mesh: child,
                                 materialIndex: idx,
-                                materialName: mat.name,
-                                originalMaterial: mat.clone()
+                                materialName: mat.name || 'Unnamed',
+                                meshName: child.name || 'Unnamed',
+                                originalMaterial: mat.clone(),
+                                color: mat.color ? mat.color.getHex() : 0xcccccc
                             });
-                            console.log(`  ├─ Primitive ${primitiveIndex}: ${mat.name} [Material ${idx}]`);
                             primitiveIndex++;
                         });
                     } else {
@@ -273,65 +274,61 @@
                             primitiveID: primitiveIndex,
                             mesh: child,
                             materialIndex: -1,
-                            materialName: child.material.name,
-                            originalMaterial: child.material.clone()
+                            materialName: child.material.name || 'Unnamed',
+                            meshName: child.name || 'Unnamed',
+                            originalMaterial: child.material.clone(),
+                            color: child.material.color ? child.material.color.getHex() : 0xcccccc
                         });
-                        console.log(`  └─ Primitive ${primitiveIndex}: ${child.material.name} [Single]`);
                         primitiveIndex++;
                     }
                 }
             });
             
-            console.log(`✅ Total primitives: ${primitives.length}`);
-            document.getElementById('primitive-count').textContent = primitives.length;
+            console.log(`Found ${primitives.length} primitives`);
+            displayPrimitives();
         }
 
-        function selectContainer(containerName) {
-            console.log('═════════════════════════════');
-            console.log('🎯 SELECT:', containerName);
-            console.log('═════════════════════════════');
+        function displayPrimitives() {
+            const foundDiv = document.getElementById('primitives-found');
+            foundDiv.innerHTML = `<span class="status-badge status-success">${primitives.length} Primitives</span>`;
             
-            if (!glbLoaded) {
-                pendingSelection = containerName;
-                return;
-            }
+            const listDiv = document.getElementById('primitives-list');
+            listDiv.innerHTML = '';
             
-            const containerInfo = CONTAINER_MAP[containerName];
-            if (!containerInfo) {
-                console.error('❌ Not in CONTAINER_MAP:', containerName);
-                updateStatus('Container not found', 'error');
-                return;
-            }
+            primitives.forEach((prim) => {
+                const div = document.createElement('div');
+                div.className = 'primitive-item';
+                div.innerHTML = `
+                    <strong>Primitive ${prim.primitiveID}</strong><br>
+                    Material: ${prim.materialName}<br>
+                    Mesh: ${prim.meshName}<br>
+                    <span style="color: #${prim.color.toString(16).padStart(6, '0')}">●</span> Color: #${prim.color.toString(16).padStart(6, '0')}
+                `;
+                div.onclick = () => highlightPrimitive(prim.primitiveID);
+                listDiv.appendChild(div);
+            });
+        }
+
+        function highlightPrimitive(primitiveID) {
+            console.log('Highlighting Primitive:', primitiveID);
             
-            console.log('✅ Container info:', containerInfo);
-            
-            const prim = primitives.find(p => p.primitiveID === containerInfo.primitiveID);
-            
-            if (!prim) {
-                console.error('❌ Primitive not found:', containerInfo.primitiveID);
-                console.log('Available:', primitives.map(p => `P${p.primitiveID}:${p.materialName}`));
-                updateStatus('Primitive not found', 'error');
-                return;
-            }
-            
-            console.log('✅ Found primitive:', prim);
-            
-            // Reset all materials to original
-            primitives.forEach((p) => {
-                if (p.materialIndex >= 0) {
-                    p.mesh.material[p.materialIndex] = p.originalMaterial.clone();
+            // Reset all
+            primitives.forEach((prim) => {
+                if (prim.materialIndex >= 0) {
+                    prim.mesh.material[prim.materialIndex] = prim.originalMaterial.clone();
                 } else {
-                    p.mesh.material = p.originalMaterial.clone();
+                    prim.mesh.material = prim.originalMaterial.clone();
                 }
             });
             
-            // Highlight the selected one
+            // Highlight selected
+            const prim = primitives[primitiveID];
             const highlightMat = new THREE.MeshStandardMaterial({
-                color: containerInfo.color,
-                emissive: containerInfo.color,
-                emissiveIntensity: 0.8,
-                roughness: 0.1,
-                metalness: 0.9
+                color: 0xffff00,
+                emissive: 0xffff00,
+                emissiveIntensity: 1.0,
+                roughness: 0.2,
+                metalness: 0.8
             });
             
             if (prim.materialIndex >= 0) {
@@ -340,80 +337,66 @@
                 prim.mesh.material = highlightMat;
             }
             
-            // Zoom camera to this container
+            // Focus camera
             const box = new THREE.Box3().setFromObject(prim.mesh);
             const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
-            const maxDim = Math.max(size.x, size.y, size.z);
-            const dist = Math.max(maxDim * 3, 6);
-            
-            camera.position.set(
-                center.x + dist * 0.7,
-                center.y + dist * 0.6,
-                center.z + dist * 0.7
-            );
             camera.lookAt(center);
             controls.target.copy(center);
             
             // Update UI
-            document.getElementById('selected-name').textContent = containerName;
-            document.getElementById('selected-value').textContent = containerInfo.value;
-            updateStatus('Focused on ' + containerName, 'success');
+            document.querySelectorAll('.primitive-item').forEach((el, idx) => {
+                el.classList.toggle('active', idx === primitiveID);
+            });
             
-            console.log('✅ Selection complete');
+            selectedPrimitiveID = primitiveID;
         }
 
-        function resetView() {
-            console.log('🔄 Resetting to full view');
+        function generateMapping() {
+            let mappingHTML = '<span class="keyword">const</span> CONTAINER_MAP = {<br>';
             
-            // Reset all materials
-            primitives.forEach((p) => {
-                if (p.materialIndex >= 0) {
-                    p.mesh.material[p.materialIndex] = p.originalMaterial.clone();
+            // Try to auto-match by material name
+            CSV_CONTAINERS.forEach((container, idx) => {
+                const matchingPrim = primitives.find(p => p.materialName === container.materialName);
+                
+                if (matchingPrim) {
+                    mappingHTML += `&nbsp;&nbsp;<span class="string">'${container.name}'</span>: { id: ${idx + 1}, primitiveID: <span class="number">${matchingPrim.primitiveID}</span>, color: <span class="number">0x${container.color.toString(16)}</span> },<br>`;
                 } else {
-                    p.mesh.material = p.originalMaterial.clone();
+                    mappingHTML += `&nbsp;&nbsp;<span class="string">'${container.name}'</span>: { id: ${idx + 1}, primitiveID: <span class="number">???</span>, color: <span class="number">0x${container.color.toString(16)}</span> }, // ❌ NOT FOUND<br>`;
                 }
             });
             
-            // Restore original camera position
-            if (originalCameraPosition && originalControlsTarget) {
-                camera.position.copy(originalCameraPosition);
-                controls.target.copy(originalControlsTarget);
-            } else {
-                fitCameraToFullModel();
-            }
+            mappingHTML += '};';
             
-            document.getElementById('selected-name').textContent = 'All Containers';
-            document.getElementById('selected-value').textContent = '-';
-            updateStatus('Showing all containers', 'info');
+            document.getElementById('mapping-code').innerHTML = mappingHTML;
         }
 
-        function fitCameraToFullModel() {
-            if (!model) return;
+        function autoSelect(containerName) {
+            console.log('Auto-selecting:', containerName);
+            const container = CSV_CONTAINERS.find(c => c.name === containerName);
+            if (!container) return;
             
+            const matchingPrim = primitives.find(p => p.materialName === container.materialName);
+            if (matchingPrim) {
+                highlightPrimitive(matchingPrim.primitiveID);
+            }
+        }
+
+        function copyMapping() {
+            const text = document.getElementById('mapping-code').textContent;
+            navigator.clipboard.writeText(text);
+            alert('✅ Mapping code copied to clipboard!');
+        }
+
+        function fitCamera() {
+            if (!model) return;
             const box = new THREE.Box3().setFromObject(model);
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
-            
             const maxDim = Math.max(size.x, size.y, size.z);
-            const fov = camera.fov * (Math.PI / 180);
-            const dist = Math.abs(maxDim / Math.tan(fov / 2)) * 2.0; // 2.0 = zoom out more to see everything
-            
-            camera.position.set(
-                center.x + dist * 0.7,
-                center.y + dist * 0.6,
-                center.z + dist * 0.7
-            );
+            const dist = maxDim * 2;
+            camera.position.set(center.x + dist, center.y + dist * 0.7, center.z + dist);
             camera.lookAt(center);
             controls.target.copy(center);
-            
-            console.log('📷 Camera fitted to full model');
-        }
-
-        function updateStatus(message, type) {
-            const statusDiv = document.getElementById('loading-status');
-            statusDiv.textContent = message;
-            statusDiv.className = `status-badge status-${type}`;
         }
 
         function animate() {
