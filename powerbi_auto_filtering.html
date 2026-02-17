@@ -113,7 +113,7 @@
             const loader = new THREE.GLTFLoader();
             
             // ⚠️ UPDATE THIS URL to point to your hosted GLB file
-           const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/deneme.glb';
+            const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/deneme.glb';
             
             console.log('📦 Loading GLB from:', glbUrl);
             
@@ -189,6 +189,13 @@
                 return;
             }
             
+            // If no container selected, reset to show whole warehouse
+            if (!containerName || containerName === '') {
+                console.log('📦 No container selected - showing whole warehouse');
+                resetToFullView();
+                return;
+            }
+            
             console.log('\n═══════════════════════════════');
             console.log('🎯 Selecting container:', containerName);
             
@@ -199,6 +206,7 @@
             if (!objectName) {
                 console.log('❌ No mapping found for:', containerName);
                 console.log('Available mappings:', Object.keys(CONTAINER_NAME_MAP));
+                resetToFullView();
                 return;
             }
             
@@ -292,9 +300,27 @@
                         .filter(o => o.name && o.name !== 'Scene')
                         .map(o => o.name)
                 );
+                resetToFullView();
             }
             
             console.log('═══════════════════════════════\n');
+        }
+
+        function resetToFullView() {
+            console.log('🔄 Resetting to full warehouse view');
+            
+            // Reset all materials to original
+            allObjects.forEach(item => {
+                if (item.object.isMesh) {
+                    const originalMat = originalMaterials.get(item.object.uuid);
+                    if (originalMat) {
+                        item.object.material = originalMat.clone();
+                    }
+                }
+            });
+            
+            // Fit camera to show entire model
+            fitCamera();
         }
 
         function fitCamera() {
