@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Warehouse 3D Viewer</title>
+    <title>Warehouse 3D Viewer - Updated</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { overflow: hidden; background: #f5f5f5; }
@@ -16,21 +16,34 @@
     <div id="viewer"></div>
 
     <script>
-        // Match containers by their GUID - EXACT format from your data
-        const CONTAINER_GUID_MAP = {
-            'Container_Red': '_407c48e0-f433-16b9-897c-ede17b5e8a37',
-            'Container_Green': 'a3564650-49fa-16cf-aac7-c5e3b7d4a4f9',
-            'Container_Blue': '_17fc96a0-d7fe-11f0-8ab0-933954616bc3',
-            'Container_Purple': '_022b8f90-e247-11f0-aacc-e9f91898e217',
-            'Container_Cyan': 'ed19e580-e24a-11f0-aacc-e9f91898e217'
+        // ⚠️ UPDATE THIS MAPPING BASED ON YOUR POWER BI DATA
+        // Map your Power BI container names to the object names in the GLB file
+        // The GLB file contains objects named: 1667, 1677, 2294, 1624, 1665, 1635, 1680, 1692, 1619, 1777
+        const CONTAINER_NAME_MAP = {
+            'Container_Red': '1667',      // Example: Update with actual mapping
+            'Container_Green': '1677',    // Example: Update with actual mapping
+            'Container_Blue': '2294',     // Example: Update with actual mapping
+            'Container_Purple': '1624',   // Example: Update with actual mapping
+            'Container_Cyan': '1665',     // Example: Update with actual mapping
+            'Container_Yellow': '1635',   // Add more as needed
+            'Container_Orange': '1680',   // Add more as needed
+            'Container_Pink': '1692',     // Add more as needed
+            'Container_Brown': '1619',    // Add more as needed
+            'Container_Grey': '1777'      // Add more as needed
         };
 
+        // Color scheme for highlighting
         const CONTAINER_COLORS = {
             'Container_Red': 0xff0000,
             'Container_Green': 0x00ff00,
             'Container_Blue': 0x0000ff,
             'Container_Purple': 0x800080,
-            'Container_Cyan': 0x00ffff
+            'Container_Cyan': 0x00ffff,
+            'Container_Yellow': 0xffff00,
+            'Container_Orange': 0xff8800,
+            'Container_Pink': 0xff69b4,
+            'Container_Brown': 0x8b4513,
+            'Container_Grey': 0x808080
         };
 
         function getURLParameter(name) {
@@ -39,7 +52,7 @@
         }
 
         const urlSelectedContainer = getURLParameter('container');
-        console.log('🎯 Selected container:', urlSelectedContainer);
+        console.log('🎯 Selected container from Power BI:', urlSelectedContainer);
 
         let scene, camera, renderer, controls;
         let model, allObjects = [];
@@ -52,7 +65,7 @@
             scene.background = new THREE.Color(0xf5f5f5);
             
             camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(10, 8, 10);
+            camera.position.set(8, 6, 8);
             
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -61,9 +74,12 @@
             
             // Lighting
             scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+            
             const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
             dirLight1.position.set(10, 10, 5);
+            dirLight1.castShadow = true;
             scene.add(dirLight1);
+            
             const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
             dirLight2.position.set(-10, 5, -10);
             scene.add(dirLight2);
@@ -74,6 +90,7 @@
                 new THREE.MeshStandardMaterial({ color: 0xdddddd })
             );
             ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
             scene.add(ground);
             
             // Grid
@@ -83,6 +100,8 @@
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
+            controls.minDistance = 1;
+            controls.maxDistance = 100;
             
             loadGLB();
             animate();
@@ -92,14 +111,16 @@
 
         function loadGLB() {
             const loader = new THREE.GLTFLoader();
-            const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/WareHouseIDTest_05.glb';
             
-            console.log('📦 Loading GLB...');
+            // ⚠️ UPDATE THIS URL to point to your hosted GLB file
+            const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/deneme.glb';
+            
+            console.log('📦 Loading GLB from:', glbUrl);
             
             loader.load(
                 glbUrl,
                 (gltf) => {
-                    console.log('✅ GLB Loaded');
+                    console.log('✅ GLB Loaded Successfully!');
                     
                     model = gltf.scene;
                     scene.add(model);
@@ -108,15 +129,13 @@
                     const box = new THREE.Box3().setFromObject(model);
                     const center = box.getCenter(new THREE.Vector3());
                     const size = box.getSize(new THREE.Vector3());
-                    model.position.set(-center.x, -center.y + size.y/2, -center.z);
+                    model.position.set(-center.x, -box.min.y, -center.z);
                     
-                    // Traverse and log ALL objects with their names
-                    console.log('═══ Scanning GLB Structure ═══');
+                    // Traverse and collect all objects
+                    console.log('\n═══ SCANNING MODEL STRUCTURE ═══');
                     model.traverse((child) => {
-                        // Log everything - meshes, groups, objects
-                        console.log('Object:', child.name || 'unnamed', 'Type:', child.type, 'UUID:', child.uuid);
+                        console.log(`Object: "${child.name}" | Type: ${child.type} | UUID: ${child.uuid}`);
                         
-                        // Store reference to ALL objects
                         allObjects.push({
                             object: child,
                             name: child.name || '',
@@ -124,32 +143,42 @@
                             type: child.type
                         });
                         
-                        // If it's a mesh, store its materials
+                        // Store original materials
                         if (child.isMesh) {
                             if (Array.isArray(child.material)) {
                                 child.material.forEach((mat, idx) => {
-                                    const key = `${child.uuid}_${idx}`;
-                                    originalMaterials.set(key, mat.clone());
-                                    console.log('  Material[' + idx + ']:', mat.name || 'unnamed');
+                                    originalMaterials.set(`${child.uuid}_${idx}`, mat.clone());
                                 });
                             } else {
                                 originalMaterials.set(child.uuid, child.material.clone());
-                                console.log('  Material:', child.material.name || 'unnamed');
                             }
                         }
                     });
                     console.log('═══════════════════════════════');
-                    console.log('Total objects found:', allObjects.length);
+                    console.log(`Total objects found: ${allObjects.length}`);
+                    
+                    // List all available object names
+                    const objectNames = allObjects
+                        .filter(obj => obj.name && obj.name !== 'Scene')
+                        .map(obj => obj.name);
+                    console.log('Available object names:', objectNames);
                     
                     // Fit camera
                     fitCamera();
                     
                     glbLoaded = true;
                     
-                    // Apply selection
+                    // Apply selection if pending
                     if (pendingSelection) {
                         setTimeout(() => selectContainer(pendingSelection), 300);
                     }
+                },
+                (xhr) => {
+                    const percent = (xhr.loaded / xhr.total * 100).toFixed(0);
+                    console.log(`Loading progress: ${percent}%`);
+                },
+                (error) => {
+                    console.error('❌ Error loading GLB:', error);
                 }
             );
         }
@@ -160,45 +189,40 @@
                 return;
             }
             
-            console.log('═══════════════════════════════');
-            console.log('🎯 Selecting:', containerName);
+            console.log('\n═══════════════════════════════');
+            console.log('🎯 Selecting container:', containerName);
             
-            const guid = CONTAINER_GUID_MAP[containerName];
-            const color = CONTAINER_COLORS[containerName];
+            // Get the object name from the mapping
+            const objectName = CONTAINER_NAME_MAP[containerName];
+            const color = CONTAINER_COLORS[containerName] || 0xff00ff;
             
-            if (!guid) {
-                console.log('❌ No GUID found for:', containerName);
+            if (!objectName) {
+                console.log('❌ No mapping found for:', containerName);
+                console.log('Available mappings:', Object.keys(CONTAINER_NAME_MAP));
                 return;
             }
             
-            console.log('Looking for GUID:', guid);
+            console.log(`Looking for object: "${objectName}"`);
             
-            // Try to find object by name matching GUID
-            // Object names might have underscore prefix like: _407c48e0-f433-16b9...
-            let matchedObjects = allObjects.filter(obj => {
-                if (!obj.name) return false;
-                
-                // Check exact GUID match
-                const exactMatch = obj.name.includes(guid);
-                // Check with underscore prefix
-                const underscoreMatch = obj.name.includes('_' + guid);
-                // Check partial GUID match (first part)
-                const guidStart = guid.split('-')[0];
-                const partialMatch = obj.name.includes(guidStart);
-                // Check with underscore + partial
-                const underscorePartialMatch = obj.name.includes('_' + guidStart);
-                
-                if (exactMatch || underscoreMatch || partialMatch || underscorePartialMatch) {
-                    console.log('✅ MATCH FOUND:', obj.name, '→ Type:', obj.type);
+            // Find objects matching the name
+            const matchedObjects = allObjects.filter(obj => {
+                // Exact match
+                if (obj.name === objectName) {
+                    console.log('✅ EXACT MATCH:', obj.name, '→ Type:', obj.type);
+                    return true;
+                }
+                // Partial match (in case of naming variations)
+                if (obj.name && obj.name.includes(objectName)) {
+                    console.log('✅ PARTIAL MATCH:', obj.name, '→ Type:', obj.type);
                     return true;
                 }
                 return false;
             });
             
-            console.log('Found', matchedObjects.length, 'matching objects');
+            console.log(`Found ${matchedObjects.length} matching object(s)`);
             
             // Reset all materials first
-            allObjects.forEach((item) => {
+            allObjects.forEach(item => {
                 if (item.object.isMesh) {
                     const originalMat = originalMaterials.get(item.object.uuid);
                     if (originalMat) {
@@ -209,7 +233,7 @@
             
             if (matchedObjects.length > 0) {
                 // Highlight all matched objects
-                matchedObjects.forEach((item) => {
+                matchedObjects.forEach(item => {
                     if (item.object.isMesh) {
                         const highlightMat = new THREE.MeshStandardMaterial({
                             color: color,
@@ -228,7 +252,7 @@
                         console.log('✅ Highlighted:', item.name);
                     }
                     
-                    // Also try to highlight any child meshes
+                    // Also highlight children
                     item.object.traverse((child) => {
                         if (child.isMesh && child !== item.object) {
                             const highlightMat = new THREE.MeshStandardMaterial({
@@ -244,7 +268,7 @@
                     });
                 });
                 
-                // Focus camera on first matched object
+                // Focus camera on the first matched object
                 const firstMatch = matchedObjects[0].object;
                 const box = new THREE.Box3().setFromObject(firstMatch);
                 const center = box.getCenter(new THREE.Vector3());
@@ -260,13 +284,17 @@
                 camera.lookAt(center);
                 controls.target.copy(center);
                 
-                console.log('📷 Camera focused');
+                console.log('📷 Camera focused on object');
             } else {
-                console.log('❌ No objects matched GUID:', guid);
-                console.log('Available object names:', allObjects.map(o => o.name).filter(n => n));
+                console.log('❌ No objects matched the name:', objectName);
+                console.log('Available object names:', 
+                    allObjects
+                        .filter(o => o.name && o.name !== 'Scene')
+                        .map(o => o.name)
+                );
             }
             
-            console.log('═══════════════════════════════');
+            console.log('═══════════════════════════════\n');
         }
 
         function fitCamera() {
@@ -277,6 +305,7 @@
             const maxDim = Math.max(size.x, size.y, size.z);
             const fov = camera.fov * (Math.PI / 180);
             const dist = Math.abs(maxDim / Math.tan(fov / 2)) * 2.0;
+            
             camera.position.set(
                 center.x + dist * 0.7,
                 center.y + dist * 0.6,
