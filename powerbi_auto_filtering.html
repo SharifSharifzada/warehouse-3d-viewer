@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Warehouse 3D Viewer - Updated</title>
+    <title>Warehouse 3D Viewer - Custom Properties</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { overflow: hidden; background: #f5f5f5; }
@@ -17,33 +17,31 @@
 
     <script>
         // ⚠️ UPDATE THIS MAPPING BASED ON YOUR POWER BI DATA
-        // Map your Power BI container names to the object names in the GLB file
-        // The GLB file contains objects named: 1667, 1677, 2294, 1624, 1665, 1635, 1680, 1692, 1619, 1777
-        const CONTAINER_NAME_MAP = {
-            'Container_Red': '1667',      // Example: Update with actual mapping
-            'Container_Green': '1677',    // Example: Update with actual mapping
-            'Container_Blue': '2294',     // Example: Update with actual mapping
-            'Container_Purple': '1624',   // Example: Update with actual mapping
-            'Container_Cyan': '1665',     // Example: Update with actual mapping
-            'Container_Yellow': '1635',   // Add more as needed
-            'Container_Orange': '1680',   // Add more as needed
-            'Container_Pink': '1692',     // Add more as needed
-            'Container_Brown': '1619',    // Add more as needed
-            'Container_Grey': '1777'      // Add more as needed
+        // Map your Power BI container names to the custom IDs in the GLB file
+        // Available IDs: 1723, 1730, 1750, 2042, 2045, 2048, 2052, 2035
+        // Note: Curve.155 has NO custom ID - you can reference it by name if needed
+        
+        const CONTAINER_ID_MAP = {
+            'Container_A': 1723,      // Example: Update with your actual container names
+            'Container_B': 1730,      // Example: Update with your actual container names
+            'Container_C': 1750,      // Example: Update with your actual container names
+            'Container_D': 2042,      // Example: Update with your actual container names
+            'Container_E': 2045,      // Example: Update with your actual container names
+            'Container_F': 2048,      // Example: Update with your actual container names
+            'Container_G': 2052,      // Example: Update with your actual container names
+            'Container_H': 2035       // Example: Update with your actual container names
         };
 
         // Color scheme for highlighting
         const CONTAINER_COLORS = {
-            'Container_Red': 0xff0000,
-            'Container_Green': 0x00ff00,
-            'Container_Blue': 0x0000ff,
-            'Container_Purple': 0x800080,
-            'Container_Cyan': 0x00ffff,
-            'Container_Yellow': 0xffff00,
-            'Container_Orange': 0xff8800,
-            'Container_Pink': 0xff69b4,
-            'Container_Brown': 0x8b4513,
-            'Container_Grey': 0x808080
+            'Container_A': 0xff0000,
+            'Container_B': 0x00ff00,
+            'Container_C': 0x0000ff,
+            'Container_D': 0xff8800,
+            'Container_E': 0x00ffff,
+            'Container_F': 0xff00ff,
+            'Container_G': 0xffff00,
+            'Container_H': 0xff69b4
         };
 
         function getURLParameter(name) {
@@ -113,7 +111,7 @@
             const loader = new THREE.GLTFLoader();
             
             // ⚠️ UPDATE THIS URL to point to your hosted GLB file
-            const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/deneme.glb';
+            const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/deneme-custom-prop.glb';
             
             console.log('📦 Loading GLB from:', glbUrl);
             
@@ -123,6 +121,14 @@
                     console.log('✅ GLB Loaded Successfully!');
                     
                     model = gltf.scene;
+                    
+                    // IMPORTANT: Extract custom properties from the GLTF parser
+                    // The userData in Three.js contains the 'extras' from the GLB
+                    const parser = gltf.parser;
+                    const json = parser.json;
+                    
+                    console.log('\n═══ EXTRACTING CUSTOM PROPERTIES ═══');
+                    
                     scene.add(model);
                     
                     // Center model
@@ -131,16 +137,20 @@
                     const size = box.getSize(new THREE.Vector3());
                     model.position.set(-center.x, -box.min.y, -center.z);
                     
-                    // Traverse and collect all objects
-                    console.log('\n═══ SCANNING MODEL STRUCTURE ═══');
+                    // Traverse and collect all objects with their custom IDs
+                    let nodeIndex = 0;
                     model.traverse((child) => {
-                        console.log(`Object: "${child.name}" | Type: ${child.type} | UUID: ${child.uuid}`);
+                        // Get custom properties from userData (which contains 'extras')
+                        const customId = child.userData?.id || null;
+                        
+                        console.log(`Object: "${child.name}" | Type: ${child.type} | Custom ID: ${customId || 'N/A'}`);
                         
                         allObjects.push({
                             object: child,
                             name: child.name || '',
                             uuid: child.uuid,
-                            type: child.type
+                            type: child.type,
+                            customId: customId
                         });
                         
                         // Store original materials
@@ -154,14 +164,16 @@
                             }
                         }
                     });
+                    
                     console.log('═══════════════════════════════');
                     console.log(`Total objects found: ${allObjects.length}`);
                     
-                    // List all available object names
-                    const objectNames = allObjects
-                        .filter(obj => obj.name && obj.name !== 'Scene')
-                        .map(obj => obj.name);
-                    console.log('Available object names:', objectNames);
+                    // List all objects with custom IDs
+                    const objectsWithIds = allObjects.filter(obj => obj.customId !== null);
+                    console.log('\n📋 Objects with Custom IDs:');
+                    objectsWithIds.forEach(obj => {
+                        console.log(`  • ID ${obj.customId}: ${obj.name}`);
+                    });
                     
                     // Fit camera
                     fitCamera();
@@ -199,29 +211,23 @@
             console.log('\n═══════════════════════════════');
             console.log('🎯 Selecting container:', containerName);
             
-            // Get the object name from the mapping
-            const objectName = CONTAINER_NAME_MAP[containerName];
+            // Get the custom ID from the mapping
+            const targetId = CONTAINER_ID_MAP[containerName];
             const color = CONTAINER_COLORS[containerName] || 0xff00ff;
             
-            if (!objectName) {
-                console.log('❌ No mapping found for:', containerName);
-                console.log('Available mappings:', Object.keys(CONTAINER_NAME_MAP));
+            if (!targetId) {
+                console.log('❌ No ID mapping found for:', containerName);
+                console.log('Available mappings:', Object.keys(CONTAINER_ID_MAP));
                 resetToFullView();
                 return;
             }
             
-            console.log(`Looking for object: "${objectName}"`);
+            console.log(`Looking for Custom ID: ${targetId}`);
             
-            // Find objects matching the name
+            // Find objects with matching custom ID
             const matchedObjects = allObjects.filter(obj => {
-                // Exact match
-                if (obj.name === objectName) {
-                    console.log('✅ EXACT MATCH:', obj.name, '→ Type:', obj.type);
-                    return true;
-                }
-                // Partial match (in case of naming variations)
-                if (obj.name && obj.name.includes(objectName)) {
-                    console.log('✅ PARTIAL MATCH:', obj.name, '→ Type:', obj.type);
+                if (obj.customId === targetId) {
+                    console.log('✅ MATCH FOUND:', obj.name, '→ Custom ID:', obj.customId);
                     return true;
                 }
                 return false;
@@ -230,75 +236,24 @@
             console.log(`Found ${matchedObjects.length} matching object(s)`);
             
             // Reset all materials first
-            allObjects.forEach(item => {
-                if (item.object.isMesh) {
-                    const originalMat = originalMaterials.get(item.object.uuid);
-                    if (originalMat) {
-                        item.object.material = originalMat.clone();
-                    }
-                }
-            });
+            resetMaterials();
             
             if (matchedObjects.length > 0) {
                 // Highlight all matched objects
                 matchedObjects.forEach(item => {
-                    if (item.object.isMesh) {
-                        const highlightMat = new THREE.MeshStandardMaterial({
-                            color: color,
-                            emissive: color,
-                            emissiveIntensity: 0.8,
-                            roughness: 0.2,
-                            metalness: 0.8
-                        });
-                        
-                        if (Array.isArray(item.object.material)) {
-                            item.object.material = item.object.material.map(() => highlightMat.clone());
-                        } else {
-                            item.object.material = highlightMat;
-                        }
-                        
-                        console.log('✅ Highlighted:', item.name);
-                    }
-                    
-                    // Also highlight children
-                    item.object.traverse((child) => {
-                        if (child.isMesh && child !== item.object) {
-                            const highlightMat = new THREE.MeshStandardMaterial({
-                                color: color,
-                                emissive: color,
-                                emissiveIntensity: 0.8,
-                                roughness: 0.2,
-                                metalness: 0.8
-                            });
-                            child.material = highlightMat;
-                            console.log('  ✅ Highlighted child mesh');
-                        }
-                    });
+                    highlightObject(item.object, color);
                 });
                 
                 // Focus camera on the first matched object
-                const firstMatch = matchedObjects[0].object;
-                const box = new THREE.Box3().setFromObject(firstMatch);
-                const center = box.getCenter(new THREE.Vector3());
-                const size = box.getSize(new THREE.Vector3());
-                const maxDim = Math.max(size.x, size.y, size.z);
-                const dist = Math.max(maxDim * 3, 6);
-                
-                camera.position.set(
-                    center.x + dist * 0.7,
-                    center.y + dist * 0.6,
-                    center.z + dist * 0.7
-                );
-                camera.lookAt(center);
-                controls.target.copy(center);
+                focusCameraOn(matchedObjects[0].object);
                 
                 console.log('📷 Camera focused on object');
             } else {
-                console.log('❌ No objects matched the name:', objectName);
-                console.log('Available object names:', 
+                console.log('❌ No objects matched Custom ID:', targetId);
+                console.log('Available IDs:', 
                     allObjects
-                        .filter(o => o.name && o.name !== 'Scene')
-                        .map(o => o.name)
+                        .filter(o => o.customId !== null)
+                        .map(o => `${o.customId} (${o.name})`)
                 );
                 resetToFullView();
             }
@@ -306,10 +261,41 @@
             console.log('═══════════════════════════════\n');
         }
 
-        function resetToFullView() {
-            console.log('🔄 Resetting to full warehouse view');
+        function highlightObject(object, color) {
+            if (object.isMesh) {
+                const highlightMat = new THREE.MeshStandardMaterial({
+                    color: color,
+                    emissive: color,
+                    emissiveIntensity: 0.8,
+                    roughness: 0.2,
+                    metalness: 0.8
+                });
+                
+                if (Array.isArray(object.material)) {
+                    object.material = object.material.map(() => highlightMat.clone());
+                } else {
+                    object.material = highlightMat;
+                }
+                
+                console.log('✅ Highlighted:', object.name);
+            }
             
-            // Reset all materials to original
+            // Also highlight children
+            object.traverse((child) => {
+                if (child.isMesh && child !== object) {
+                    const highlightMat = new THREE.MeshStandardMaterial({
+                        color: color,
+                        emissive: color,
+                        emissiveIntensity: 0.8,
+                        roughness: 0.2,
+                        metalness: 0.8
+                    });
+                    child.material = highlightMat;
+                }
+            });
+        }
+
+        function resetMaterials() {
             allObjects.forEach(item => {
                 if (item.object.isMesh) {
                     const originalMat = originalMaterials.get(item.object.uuid);
@@ -318,8 +304,27 @@
                     }
                 }
             });
+        }
+
+        function focusCameraOn(object) {
+            const box = new THREE.Box3().setFromObject(object);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const dist = Math.max(maxDim * 3, 6);
             
-            // Fit camera to show entire model
+            camera.position.set(
+                center.x + dist * 0.7,
+                center.y + dist * 0.6,
+                center.z + dist * 0.7
+            );
+            camera.lookAt(center);
+            controls.target.copy(center);
+        }
+
+        function resetToFullView() {
+            console.log('🔄 Resetting to full warehouse view');
+            resetMaterials();
             fitCamera();
         }
 
