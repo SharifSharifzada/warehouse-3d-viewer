@@ -264,33 +264,89 @@
             
             console.log(`Found ${matchedObjects.length} matching object(s) for ID ${targetId}`);
             
-            // Reset all materials first
-            resetMaterials();
+            // Reset all materials AND hide all objects
+            allObjects.forEach(item => {
+                if (item.object.isMesh) {
+                    // Reset material
+                    const originalMat = originalMaterials.get(item.object.uuid);
+                    if (originalMat) {
+                        item.object.material = originalMat.clone();
+                    }
+                    // Hide all objects initially
+                    item.object.visible = false;
+                }
+            });
             
             if (matchedObjects.length > 0) {
-                // Highlight with bright red
+                // Highlight with bright red and make ONLY matched objects visible
                 const color = 0xff0000;
                 
-                console.log('🎨 Highlighting objects...');
+                console.log('🎨 Highlighting and showing ONLY selected objects...');
                 matchedObjects.forEach((item, index) => {
+                    // Make visible
+                    item.object.visible = true;
+                    
+                    // Also make sure parent objects are visible
+                    let parent = item.object.parent;
+                    while (parent) {
+                        parent.visible = true;
+                        parent = parent.parent;
+                    }
+                    
+                    // Highlight
                     highlightObject(item.object, color);
-                    console.log(`  ${index + 1}. Highlighted: ${item.name}`);
+                    console.log(`  ${index + 1}. Highlighted and showing: ${item.name}`);
                 });
                 
-                // Focus camera on the first matched object
-                console.log('📷 Focusing camera...');
-                focusCameraOn(matchedObjects[0].object);
-                console.log('✅ Camera focused on container');
+                // Focus camera MUCH CLOSER on the first matched object
+                console.log('📷 Focusing camera (close zoom)...');
+                focusCameraOnClose(matchedObjects[0].object);
+                console.log('✅ Camera focused on container (isolated view)');
             } else {
                 console.log('❌ No container found with ID:', targetId);
                 console.log('💡 Available ID range:', Math.min(...availableIds), '-', Math.max(...availableIds));
                 console.log('💡 Check if ID', targetId, 'exists in your GLB model');
                 
-                // Don't reset view - keep showing warehouse so user can see what's there
-                console.log('⚠️ Keeping current view (not resetting)');
+                // Show all objects again if nothing matched
+                resetToFullView();
             }
             
             console.log('═══════════════════════════════\n');
+        }
+
+        function resetToFullView() {
+            console.log('🔄 Resetting to full warehouse view');
+            
+            // Show all objects and reset materials
+            allObjects.forEach(item => {
+                if (item.object.isMesh) {
+                    item.object.visible = true;
+                    const originalMat = originalMaterials.get(item.object.uuid);
+                    if (originalMat) {
+                        item.object.material = originalMat.clone();
+                    }
+                }
+            });
+            
+            fitCamera();
+        }
+
+        function focusCameraOnClose(object) {
+            const box = new THREE.Box3().setFromObject(object);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            
+            // VERY CLOSE zoom - 0.8x the object size for tight framing
+            const dist = Math.max(maxDim * 0.8, 2);
+            
+            camera.position.set(
+                center.x + dist * 0.6,
+                center.y + dist * 0.7,  // Slightly from above
+                center.z + dist * 0.6
+            );
+            camera.lookAt(center);
+            controls.target.copy(center);
         }
 
         function highlightObject(object, color) {
