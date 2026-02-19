@@ -50,7 +50,7 @@
         // ⚠️⚠️⚠️ SECURITY TOKEN - CHANGE THIS TO YOUR OWN SECRET! ⚠️⚠️⚠️
         // Generate a random token: https://www.uuidgenerator.net/
         // Or use a strong password
-        const ACCESS_TOKEN = 'Birmarket-Secure-2024-Y10G2P7M4';
+        const ACCESS_TOKEN = 'warehouse-secret-2024-xyz789';  // ← CHANGE THIS!
         
         // Token validation
         function getURLParameter(name) {
@@ -218,39 +218,79 @@
 
         function selectContainer(containerIdentifier) {
             if (!glbLoaded) {
+                console.log('⏳ Model not loaded yet, pending selection:', containerIdentifier);
                 pendingSelection = containerIdentifier;
                 return;
             }
             
+            // If no container selected, reset to show whole warehouse
             if (!containerIdentifier || containerIdentifier === '') {
                 console.log('📦 No container selected - showing whole warehouse');
                 resetToFullView();
                 return;
             }
             
-            console.log('🎯 Selecting container:', containerIdentifier);
+            console.log('\n═══════════════════════════════');
+            console.log('🎯 Selecting container ID:', containerIdentifier);
+            console.log('Type of received ID:', typeof containerIdentifier);
             
+            // Parse container ID
             const targetId = parseInt(containerIdentifier);
             if (isNaN(targetId)) {
-                console.log('❌ Invalid container ID');
+                console.log('❌ Invalid container ID - must be numeric');
+                console.log('Received:', containerIdentifier);
                 resetToFullView();
                 return;
             }
             
-            const matchedObjects = allObjects.filter(obj => obj.numericId === targetId);
-            console.log(`Found ${matchedObjects.length} matching object(s)`);
+            console.log(`✓ Parsed target ID: ${targetId}`);
             
+            // Debug: Show available IDs
+            const availableIds = allObjects
+                .filter(obj => obj.numericId !== null)
+                .map(obj => obj.numericId)
+                .filter((id, index, self) => self.indexOf(id) === index)
+                .sort((a, b) => a - b);
+            console.log(`Available IDs in model: ${availableIds.slice(0, 20).join(', ')}... (showing first 20)`);
+            
+            // Find all objects with matching numeric ID
+            const matchedObjects = allObjects.filter(obj => {
+                if (obj.numericId === targetId) {
+                    console.log('✅ MATCH FOUND:', obj.name, '→ ID:', obj.numericId, '→ Type:', obj.type);
+                    return true;
+                }
+                return false;
+            });
+            
+            console.log(`Found ${matchedObjects.length} matching object(s) for ID ${targetId}`);
+            
+            // Reset all materials first
             resetMaterials();
             
             if (matchedObjects.length > 0) {
-                const color = 0xff0000; // Red
-                matchedObjects.forEach(item => {
+                // Highlight with bright red
+                const color = 0xff0000;
+                
+                console.log('🎨 Highlighting objects...');
+                matchedObjects.forEach((item, index) => {
                     highlightObject(item.object, color);
+                    console.log(`  ${index + 1}. Highlighted: ${item.name}`);
                 });
+                
+                // Focus camera on the first matched object
+                console.log('📷 Focusing camera...');
                 focusCameraOn(matchedObjects[0].object);
+                console.log('✅ Camera focused on container');
             } else {
-                resetToFullView();
+                console.log('❌ No container found with ID:', targetId);
+                console.log('💡 Available ID range:', Math.min(...availableIds), '-', Math.max(...availableIds));
+                console.log('💡 Check if ID', targetId, 'exists in your GLB model');
+                
+                // Don't reset view - keep showing warehouse so user can see what's there
+                console.log('⚠️ Keeping current view (not resetting)');
             }
+            
+            console.log('═══════════════════════════════\n');
         }
 
         function highlightObject(object, color) {
@@ -300,7 +340,9 @@
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z);
-            const dist = Math.max(maxDim * 4, 10);
+            
+            // Much closer zoom - reduced from 4x to 1.5x the object size
+            const dist = Math.max(maxDim * 1.5, 3);  // Changed from 4 to 1.5
             
             camera.position.set(
                 center.x + dist * 0.7,
