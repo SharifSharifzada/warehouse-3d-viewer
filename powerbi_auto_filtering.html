@@ -197,12 +197,21 @@
                     
                     console.log(`Objects with numeric IDs: ${numericObjects}`);
                     
+                    // Make sure all objects are visible initially
+                    allObjects.forEach(item => {
+                        if (item.object.isMesh || item.object.isGroup || item.object.isObject3D) {
+                            item.object.visible = true;
+                        }
+                    });
+                    
                     fitCamera();
                     glbLoaded = true;
                     
                     // Apply pending selection if any
                     if (pendingSelection) {
                         setTimeout(() => selectContainer(pendingSelection), 500);
+                    } else {
+                        console.log('📦 No selection - showing full warehouse');
                     }
                 },
                 (xhr) => {
@@ -257,10 +266,12 @@
             
             // STEP 1: Hide ALL objects initially
             allObjects.forEach(item => {
-                if (item.object.isMesh) {
+                if (item.object.isMesh || item.object.isGroup || item.object.isObject3D) {
                     item.object.visible = false;
-                    
-                    // Reset material
+                }
+                
+                // Reset material for meshes
+                if (item.object.isMesh) {
                     const originalMat = originalMaterials.get(item.object.uuid);
                     if (originalMat) {
                         item.object.material = originalMat.clone();
@@ -308,8 +319,13 @@
             
             // Show all objects and reset materials
             allObjects.forEach(item => {
-                if (item.object.isMesh) {
+                // Make all objects visible (not just meshes)
+                if (item.object.isMesh || item.object.isGroup || item.object.isObject3D) {
                     item.object.visible = true;
+                }
+                
+                // Reset material for meshes
+                if (item.object.isMesh) {
                     const originalMat = originalMaterials.get(item.object.uuid);
                     if (originalMat) {
                         item.object.material = originalMat.clone();
