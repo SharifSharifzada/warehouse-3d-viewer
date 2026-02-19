@@ -2,53 +2,85 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Warehouse 3D Viewer - Custom Properties</title>
+    <title>Warehouse 3D Viewer - Secure</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { overflow: hidden; background: #f5f5f5; }
+        body { overflow: hidden; background: #f5f5f5; font-family: Arial, sans-serif; }
         #viewer { width: 100vw; height: 100vh; }
+        #access-denied {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 9999;
+        }
+        #access-denied h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        #access-denied p {
+            font-size: 18px;
+            opacity: 0.8;
+        }
+        .lock-icon {
+            font-size: 100px;
+            margin-bottom: 30px;
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
+    <div id="access-denied">
+        <div class="lock-icon">🔒</div>
+        <h1>Access Denied</h1>
+        <p>Unauthorized access to this resource</p>
+    </div>
     <div id="viewer"></div>
 
     <script>
-        // ⚠️ UPDATE THIS MAPPING BASED ON YOUR POWER BI DATA
-        // Map your Power BI container names to the custom IDs in the GLB file
-        // Available IDs: 1723, 1730, 1750, 2042, 2045, 2048, 2052, 2035
-        // Note: Curve.155 has NO custom ID - you can reference it by name if needed
+        // ⚠️⚠️⚠️ SECURITY TOKEN - CHANGE THIS TO YOUR OWN SECRET! ⚠️⚠️⚠️
+        // Generate a random token: https://www.uuidgenerator.net/
+        // Or use a strong password
+        const ACCESS_TOKEN = 'warehouse-secret-2024-xyz789';  // ← CHANGE THIS!
         
-        const CONTAINER_ID_MAP = {
-            'Container_A': 1723,      // Example: Update with your actual container names
-            'Container_B': 1730,      // Example: Update with your actual container names
-            'Container_C': 1750,      // Example: Update with your actual container names
-            'Container_D': 2042,      // Example: Update with your actual container names
-            'Container_E': 2045,      // Example: Update with your actual container names
-            'Container_F': 2048,      // Example: Update with your actual container names
-            'Container_G': 2052,      // Example: Update with your actual container names
-            'Container_H': 2035       // Example: Update with your actual container names
-        };
-
-        // Color scheme for highlighting
-        const CONTAINER_COLORS = {
-            'Container_A': 0xff0000,
-            'Container_B': 0x00ff00,
-            'Container_C': 0x0000ff,
-            'Container_D': 0xff8800,
-            'Container_E': 0x00ffff,
-            'Container_F': 0xff00ff,
-            'Container_G': 0xffff00,
-            'Container_H': 0xff69b4
-        };
-
+        // Token validation
         function getURLParameter(name) {
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get(name);
         }
-
+        
+        function validateAccess() {
+            const providedToken = getURLParameter('token');
+            
+            if (providedToken !== ACCESS_TOKEN) {
+                console.error('🚫 Access denied - invalid token');
+                document.getElementById('access-denied').style.display = 'flex';
+                document.getElementById('viewer').style.display = 'none';
+                return false;
+            }
+            
+            console.log('✅ Access granted');
+            return true;
+        }
+        
+        // Validate access before loading anything
+        if (!validateAccess()) {
+            throw new Error('Unauthorized');
+        }
+        
+        // ====================================================================
+        // REST OF THE CODE (Same as before, but now protected)
+        // ====================================================================
+        
         const urlSelectedContainer = getURLParameter('container');
         console.log('🎯 Selected container from Power BI:', urlSelectedContainer);
 
@@ -63,7 +95,7 @@
             scene.background = new THREE.Color(0xf5f5f5);
             
             camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(8, 6, 8);
+            camera.position.set(50, 40, 50);
             
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -71,20 +103,24 @@
             document.getElementById('viewer').appendChild(renderer.domElement);
             
             // Lighting
-            scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+            scene.add(new THREE.AmbientLight(0xffffff, 0.8));
             
-            const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
-            dirLight1.position.set(10, 10, 5);
+            const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.7);
+            dirLight1.position.set(100, 100, 50);
             dirLight1.castShadow = true;
             scene.add(dirLight1);
             
-            const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
-            dirLight2.position.set(-10, 5, -10);
+            const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+            dirLight2.position.set(-100, 50, -100);
             scene.add(dirLight2);
+            
+            const dirLight3 = new THREE.DirectionalLight(0xffffff, 0.3);
+            dirLight3.position.set(0, 50, 100);
+            scene.add(dirLight3);
             
             // Ground
             const ground = new THREE.Mesh(
-                new THREE.PlaneGeometry(30, 30),
+                new THREE.PlaneGeometry(500, 500),
                 new THREE.MeshStandardMaterial({ color: 0xdddddd })
             );
             ground.rotation.x = -Math.PI / 2;
@@ -92,14 +128,14 @@
             scene.add(ground);
             
             // Grid
-            scene.add(new THREE.GridHelper(30, 30, 0xcccccc, 0xe0e0e0));
+            scene.add(new THREE.GridHelper(500, 100, 0xcccccc, 0xe0e0e0));
             
             // Controls
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
-            controls.minDistance = 1;
-            controls.maxDistance = 100;
+            controls.minDistance = 5;
+            controls.maxDistance = 500;
             
             loadGLB();
             animate();
@@ -111,9 +147,9 @@
             const loader = new THREE.GLTFLoader();
             
             // ⚠️ UPDATE THIS URL to point to your hosted GLB file
-            const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/deneme-custom-prop.glb';
+            const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/warehouse-3d.glb';
             
-            console.log('📦 Loading GLB from:', glbUrl);
+            console.log('📦 Loading warehouse GLB...');
             
             loader.load(
                 glbUrl,
@@ -121,14 +157,6 @@
                     console.log('✅ GLB Loaded Successfully!');
                     
                     model = gltf.scene;
-                    
-                    // IMPORTANT: Extract custom properties from the GLTF parser
-                    // The userData in Three.js contains the 'extras' from the GLB
-                    const parser = gltf.parser;
-                    const json = parser.json;
-                    
-                    console.log('\n═══ EXTRACTING CUSTOM PROPERTIES ═══');
-                    
                     scene.add(model);
                     
                     // Center model
@@ -137,21 +165,25 @@
                     const size = box.getSize(new THREE.Vector3());
                     model.position.set(-center.x, -box.min.y, -center.z);
                     
-                    // Traverse and collect all objects with their custom IDs
-                    let nodeIndex = 0;
+                    console.log('═══ SCANNING WAREHOUSE ═══');
+                    
+                    // Traverse and collect all objects
+                    let numericObjects = 0;
                     model.traverse((child) => {
-                        // Get custom properties from userData (which contains 'extras')
-                        const customId = child.userData?.id || null;
-                        
-                        console.log(`Object: "${child.name}" | Type: ${child.type} | Custom ID: ${customId || 'N/A'}`);
+                        const match = child.name?.match(/^(\d+)(?:\.(\d+))?$/);
+                        const numericId = match ? parseInt(match[1]) : null;
                         
                         allObjects.push({
                             object: child,
                             name: child.name || '',
                             uuid: child.uuid,
                             type: child.type,
-                            customId: customId
+                            numericId: numericId
                         });
+                        
+                        if (numericId !== null) {
+                            numericObjects++;
+                        }
                         
                         // Store original materials
                         if (child.isMesh) {
@@ -165,29 +197,18 @@
                         }
                     });
                     
-                    console.log('═══════════════════════════════');
-                    console.log(`Total objects found: ${allObjects.length}`);
+                    console.log(`Objects with numeric IDs: ${numericObjects}`);
                     
-                    // List all objects with custom IDs
-                    const objectsWithIds = allObjects.filter(obj => obj.customId !== null);
-                    console.log('\n📋 Objects with Custom IDs:');
-                    objectsWithIds.forEach(obj => {
-                        console.log(`  • ID ${obj.customId}: ${obj.name}`);
-                    });
-                    
-                    // Fit camera
                     fitCamera();
-                    
                     glbLoaded = true;
                     
-                    // Apply selection if pending
                     if (pendingSelection) {
-                        setTimeout(() => selectContainer(pendingSelection), 300);
+                        setTimeout(() => selectContainer(pendingSelection), 500);
                     }
                 },
                 (xhr) => {
                     const percent = (xhr.loaded / xhr.total * 100).toFixed(0);
-                    console.log(`Loading progress: ${percent}%`);
+                    console.log(`Loading: ${percent}%`);
                 },
                 (error) => {
                     console.error('❌ Error loading GLB:', error);
@@ -195,70 +216,41 @@
             );
         }
 
-        function selectContainer(containerName) {
+        function selectContainer(containerIdentifier) {
             if (!glbLoaded) {
-                pendingSelection = containerName;
+                pendingSelection = containerIdentifier;
                 return;
             }
             
-            // If no container selected, reset to show whole warehouse
-            if (!containerName || containerName === '') {
+            if (!containerIdentifier || containerIdentifier === '') {
                 console.log('📦 No container selected - showing whole warehouse');
                 resetToFullView();
                 return;
             }
             
-            console.log('\n═══════════════════════════════');
-            console.log('🎯 Selecting container:', containerName);
+            console.log('🎯 Selecting container:', containerIdentifier);
             
-            // Get the custom ID from the mapping
-            const targetId = CONTAINER_ID_MAP[containerName];
-            const color = CONTAINER_COLORS[containerName] || 0xff00ff;
-            
-            if (!targetId) {
-                console.log('❌ No ID mapping found for:', containerName);
-                console.log('Available mappings:', Object.keys(CONTAINER_ID_MAP));
+            const targetId = parseInt(containerIdentifier);
+            if (isNaN(targetId)) {
+                console.log('❌ Invalid container ID');
                 resetToFullView();
                 return;
             }
             
-            console.log(`Looking for Custom ID: ${targetId}`);
-            
-            // Find objects with matching custom ID
-            const matchedObjects = allObjects.filter(obj => {
-                if (obj.customId === targetId) {
-                    console.log('✅ MATCH FOUND:', obj.name, '→ Custom ID:', obj.customId);
-                    return true;
-                }
-                return false;
-            });
-            
+            const matchedObjects = allObjects.filter(obj => obj.numericId === targetId);
             console.log(`Found ${matchedObjects.length} matching object(s)`);
             
-            // Reset all materials first
             resetMaterials();
             
             if (matchedObjects.length > 0) {
-                // Highlight all matched objects
+                const color = 0xff0000; // Red
                 matchedObjects.forEach(item => {
                     highlightObject(item.object, color);
                 });
-                
-                // Focus camera on the first matched object
                 focusCameraOn(matchedObjects[0].object);
-                
-                console.log('📷 Camera focused on object');
             } else {
-                console.log('❌ No objects matched Custom ID:', targetId);
-                console.log('Available IDs:', 
-                    allObjects
-                        .filter(o => o.customId !== null)
-                        .map(o => `${o.customId} (${o.name})`)
-                );
                 resetToFullView();
             }
-            
-            console.log('═══════════════════════════════\n');
         }
 
         function highlightObject(object, color) {
@@ -266,7 +258,7 @@
                 const highlightMat = new THREE.MeshStandardMaterial({
                     color: color,
                     emissive: color,
-                    emissiveIntensity: 0.8,
+                    emissiveIntensity: 0.9,
                     roughness: 0.2,
                     metalness: 0.8
                 });
@@ -276,17 +268,14 @@
                 } else {
                     object.material = highlightMat;
                 }
-                
-                console.log('✅ Highlighted:', object.name);
             }
             
-            // Also highlight children
             object.traverse((child) => {
                 if (child.isMesh && child !== object) {
                     const highlightMat = new THREE.MeshStandardMaterial({
                         color: color,
                         emissive: color,
-                        emissiveIntensity: 0.8,
+                        emissiveIntensity: 0.9,
                         roughness: 0.2,
                         metalness: 0.8
                     });
@@ -311,7 +300,7 @@
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z);
-            const dist = Math.max(maxDim * 3, 6);
+            const dist = Math.max(maxDim * 4, 10);
             
             camera.position.set(
                 center.x + dist * 0.7,
@@ -323,7 +312,6 @@
         }
 
         function resetToFullView() {
-            console.log('🔄 Resetting to full warehouse view');
             resetMaterials();
             fitCamera();
         }
@@ -335,11 +323,11 @@
             const size = box.getSize(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z);
             const fov = camera.fov * (Math.PI / 180);
-            const dist = Math.abs(maxDim / Math.tan(fov / 2)) * 2.0;
+            const dist = Math.abs(maxDim / Math.tan(fov / 2)) * 1.5;
             
             camera.position.set(
                 center.x + dist * 0.7,
-                center.y + dist * 0.6,
+                center.y + dist * 0.5,
                 center.z + dist * 0.7
             );
             camera.lookAt(center);
