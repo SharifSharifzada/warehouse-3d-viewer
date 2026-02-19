@@ -47,14 +47,16 @@
     <div id="viewer"></div>
 
     <script>
-        const ACCESS_TOKEN = 'warehouse-secret-2024-xyz789';  // ← CHANGE THIS!
+        // ⚠️ CHANGE THIS TO YOUR SECRET TOKEN
+        const ACCESS_TOKEN = 'Birmarket-Secure-2024-Y10G2P7M4';
         
-        // Token validation
+        // Get URL parameters
         function getURLParameter(name) {
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get(name);
         }
         
+        // Validate access token
         function validateAccess() {
             const providedToken = getURLParameter('token');
             
@@ -69,24 +71,23 @@
             return true;
         }
         
-        // Validate access before loading anything
+        // Check access before loading
         if (!validateAccess()) {
             throw new Error('Unauthorized');
         }
         
-        // ====================================================================
-        // REST OF THE CODE (Same as before, but now protected)
-        // ====================================================================
-        
+        // Get selected container from URL
         const urlSelectedContainer = getURLParameter('container');
         console.log('🎯 Selected container from Power BI:', urlSelectedContainer);
 
+        // Global variables
         let scene, camera, renderer, controls;
         let model, allObjects = [];
         let glbLoaded = false;
         let pendingSelection = urlSelectedContainer;
         let originalMaterials = new Map();
 
+        // Initialize 3D scene
         function init() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xf5f5f5);
@@ -99,7 +100,7 @@
             renderer.shadowMap.enabled = true;
             document.getElementById('viewer').appendChild(renderer.domElement);
             
-            // Lighting
+            // Lighting setup
             scene.add(new THREE.AmbientLight(0xffffff, 0.8));
             
             const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.7);
@@ -115,7 +116,7 @@
             dirLight3.position.set(0, 50, 100);
             scene.add(dirLight3);
             
-            // Ground
+            // Ground plane
             const ground = new THREE.Mesh(
                 new THREE.PlaneGeometry(500, 500),
                 new THREE.MeshStandardMaterial({ color: 0xdddddd })
@@ -124,10 +125,10 @@
             ground.receiveShadow = true;
             scene.add(ground);
             
-            // Grid
+            // Grid helper
             scene.add(new THREE.GridHelper(500, 100, 0xcccccc, 0xe0e0e0));
             
-            // Controls
+            // Camera controls
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
@@ -140,10 +141,9 @@
             window.addEventListener('resize', onResize);
         }
 
+        // Load 3D model
         function loadGLB() {
             const loader = new THREE.GLTFLoader();
-            
-            // ⚠️ UPDATE THIS URL to point to your hosted GLB file
             const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/warehouse-3d.glb';
             
             console.log('📦 Loading warehouse GLB...');
@@ -156,7 +156,7 @@
                     model = gltf.scene;
                     scene.add(model);
                     
-                    // Center model
+                    // Center the model
                     const box = new THREE.Box3().setFromObject(model);
                     const center = box.getCenter(new THREE.Vector3());
                     const size = box.getSize(new THREE.Vector3());
@@ -164,9 +164,10 @@
                     
                     console.log('═══ SCANNING WAREHOUSE ═══');
                     
-                    // Traverse and collect all objects
+                    // Collect all objects with their IDs
                     let numericObjects = 0;
                     model.traverse((child) => {
+                        // Extract numeric ID from object name (e.g., "1234" or "1234.001")
                         const match = child.name?.match(/^(\d+)(?:\.(\d+))?$/);
                         const numericId = match ? parseInt(match[1]) : null;
                         
@@ -182,7 +183,7 @@
                             numericObjects++;
                         }
                         
-                        // Store original materials
+                        // Store original materials for later reset
                         if (child.isMesh) {
                             if (Array.isArray(child.material)) {
                                 child.material.forEach((mat, idx) => {
@@ -199,6 +200,7 @@
                     fitCamera();
                     glbLoaded = true;
                     
+                    // Apply pending selection if any
                     if (pendingSelection) {
                         setTimeout(() => selectContainer(pendingSelection), 500);
                     }
@@ -213,6 +215,7 @@
             );
         }
 
+        // Select and highlight a specific container
         function selectContainer(containerIdentifier) {
             if (!glbLoaded) {
                 console.log('⏳ Model not loaded yet, pending selection:', containerIdentifier);
@@ -220,7 +223,7 @@
                 return;
             }
             
-            // If no container selected, reset to show whole warehouse
+            // If no container selected, show whole warehouse
             if (!containerIdentifier || containerIdentifier === '') {
                 console.log('📦 No container selected - showing whole warehouse');
                 resetToFullView();
@@ -229,9 +232,8 @@
             
             console.log('\n═══════════════════════════════');
             console.log('🎯 Selecting container ID:', containerIdentifier);
-            console.log('Type of received ID:', typeof containerIdentifier);
             
-            // Parse container ID
+            // Parse container ID to number
             const targetId = parseInt(containerIdentifier);
             if (isNaN(targetId)) {
                 console.log('❌ Invalid container ID - must be numeric');
@@ -242,15 +244,7 @@
             
             console.log(`✓ Parsed target ID: ${targetId}`);
             
-            // Debug: Show available IDs
-            const availableIds = allObjects
-                .filter(obj => obj.numericId !== null)
-                .map(obj => obj.numericId)
-                .filter((id, index, self) => self.indexOf(id) === index)
-                .sort((a, b) => a - b);
-            console.log(`Available IDs in model: ${availableIds.slice(0, 20).join(', ')}... (showing first 20)`);
-            
-            // Find all objects with matching numeric ID
+            // Find objects matching the target ID
             const matchedObjects = allObjects.filter(obj => {
                 if (obj.numericId === targetId) {
                     console.log('✅ MATCH FOUND:', obj.name, '→ ID:', obj.numericId, '→ Type:', obj.type);
@@ -261,56 +255,54 @@
             
             console.log(`Found ${matchedObjects.length} matching object(s) for ID ${targetId}`);
             
-            // Reset all materials AND hide all objects
+            // STEP 1: Hide ALL objects initially
             allObjects.forEach(item => {
                 if (item.object.isMesh) {
+                    item.object.visible = false;
+                    
                     // Reset material
                     const originalMat = originalMaterials.get(item.object.uuid);
                     if (originalMat) {
                         item.object.material = originalMat.clone();
                     }
-                    // Hide all objects initially
-                    item.object.visible = false;
                 }
             });
             
             if (matchedObjects.length > 0) {
-                // Highlight with bright red and make ONLY matched objects visible
-                const color = 0xff0000;
+                const color = 0xff0000; // Red highlight
                 
                 console.log('🎨 Highlighting and showing ONLY selected objects...');
+                
+                // STEP 2: Show ONLY matched objects
                 matchedObjects.forEach((item, index) => {
-                    // Make visible
+                    // Make the matched object visible
                     item.object.visible = true;
                     
-                    // Also make sure parent objects are visible
+                    // Make sure all parent objects are visible too
                     let parent = item.object.parent;
                     while (parent) {
                         parent.visible = true;
                         parent = parent.parent;
                     }
                     
-                    // Highlight
+                    // Highlight the object in red
                     highlightObject(item.object, color);
                     console.log(`  ${index + 1}. Highlighted and showing: ${item.name}`);
                 });
                 
-                // Focus camera MUCH CLOSER on the first matched object
+                // STEP 3: Zoom camera VERY CLOSE to the selected object
                 console.log('📷 Focusing camera (close zoom)...');
                 focusCameraOnClose(matchedObjects[0].object);
                 console.log('✅ Camera focused on container (isolated view)');
             } else {
                 console.log('❌ No container found with ID:', targetId);
-                console.log('💡 Available ID range:', Math.min(...availableIds), '-', Math.max(...availableIds));
-                console.log('💡 Check if ID', targetId, 'exists in your GLB model');
-                
-                // Show all objects again if nothing matched
                 resetToFullView();
             }
             
             console.log('═══════════════════════════════\n');
         }
 
+        // Reset view to show entire warehouse
         function resetToFullView() {
             console.log('🔄 Resetting to full warehouse view');
             
@@ -328,13 +320,14 @@
             fitCamera();
         }
 
+        // Zoom camera very close to selected object
         function focusCameraOnClose(object) {
             const box = new THREE.Box3().setFromObject(object);
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z);
             
-            // VERY CLOSE zoom - 0.8x the object size for tight framing
+            // 0.8 = VERY CLOSE zoom (smaller = closer)
             const dist = Math.max(maxDim * 0.8, 2);
             
             camera.position.set(
@@ -346,6 +339,7 @@
             controls.target.copy(center);
         }
 
+        // Apply red highlight material to object
         function highlightObject(object, color) {
             if (object.isMesh) {
                 const highlightMat = new THREE.MeshStandardMaterial({
@@ -363,6 +357,7 @@
                 }
             }
             
+            // Also highlight child meshes
             object.traverse((child) => {
                 if (child.isMesh && child !== object) {
                     const highlightMat = new THREE.MeshStandardMaterial({
@@ -377,40 +372,7 @@
             });
         }
 
-        function resetMaterials() {
-            allObjects.forEach(item => {
-                if (item.object.isMesh) {
-                    const originalMat = originalMaterials.get(item.object.uuid);
-                    if (originalMat) {
-                        item.object.material = originalMat.clone();
-                    }
-                }
-            });
-        }
-
-        function focusCameraOn(object) {
-            const box = new THREE.Box3().setFromObject(object);
-            const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
-            const maxDim = Math.max(size.x, size.y, size.z);
-            
-            // Much closer zoom - reduced from 4x to 1.5x the object size
-            const dist = Math.max(maxDim * 1.5, 3);  // Changed from 4 to 1.5
-            
-            camera.position.set(
-                center.x + dist * 0.7,
-                center.y + dist * 0.6,
-                center.z + dist * 0.7
-            );
-            camera.lookAt(center);
-            controls.target.copy(center);
-        }
-
-        function resetToFullView() {
-            resetMaterials();
-            fitCamera();
-        }
-
+        // Fit camera to show entire model
         function fitCamera() {
             if (!model) return;
             const box = new THREE.Box3().setFromObject(model);
@@ -429,18 +391,21 @@
             controls.target.copy(center);
         }
 
+        // Animation loop
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
             renderer.render(scene, camera);
         }
 
+        // Handle window resize
         function onResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
+        // Start everything
         window.addEventListener('load', init);
     </script>
 </body>
