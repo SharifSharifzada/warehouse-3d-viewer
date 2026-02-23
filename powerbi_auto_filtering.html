@@ -10,130 +10,101 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <style>
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
 :root {
   --bg:       #0b0c0e;
   --surface:  #13151a;
   --surface2: #1c1f27;
   --border:   rgba(255,255,255,0.06);
-  --accent:   #d4ff3e;
+  --accent:   #ff6a00;
   --text:     #e8e9eb;
   --muted:    #5a6072;
   --danger:   #ff5c5c;
   --success:  #3effa0;
 }
-
 html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); }
-
 #canvas-wrap { position: fixed; inset: 0; }
 #canvas-wrap canvas { display: block; width: 100% !important; height: 100% !important; }
 
-/* ─── Loading ─── */
+/* Loading */
 #loading {
   position: fixed; inset: 0; background: var(--bg);
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
   z-index: 100; gap: 18px;
   transition: opacity 0.5s ease, visibility 0.5s ease;
 }
 #loading.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.load-logo { font-family:'Syne',sans-serif; font-size:12px; font-weight:700; letter-spacing:0.35em; text-transform:uppercase; color:var(--muted); }
+.load-bar-wrap { width:180px; height:2px; background:var(--surface2); border-radius:2px; overflow:hidden; }
+.load-bar { height:100%; width:0%; background:var(--accent); border-radius:2px; transition:width 0.25s ease; }
+.load-pct { font-family:'DM Mono',monospace; font-size:11px; color:var(--muted); }
+.load-status { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:0.05em; }
 
-.load-logo {
-  font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700;
-  letter-spacing: 0.35em; text-transform: uppercase; color: var(--muted);
-}
-.load-bar-wrap {
-  width: 180px; height: 2px; background: var(--surface2);
-  border-radius: 2px; overflow: hidden;
-}
-.load-bar {
-  height: 100%; width: 0%; background: var(--accent);
-  border-radius: 2px; transition: width 0.25s ease;
-}
-.load-pct  { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); }
-.load-status { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.05em; }
-
-/* ─── Top bar ─── */
+/* Top bar */
 #topbar {
-  position: fixed; top: 0; left: 0; right: 0; height: 48px;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 16px;
-  background: linear-gradient(to bottom, rgba(11,12,14,0.9) 0%, transparent 100%);
-  z-index: 10; pointer-events: none;
+  position:fixed; top:0; left:0; right:0; height:48px;
+  display:flex; align-items:center; justify-content:space-between; padding:0 16px;
+  background:linear-gradient(to bottom,rgba(11,12,14,0.9) 0%,transparent 100%);
+  z-index:10; pointer-events:none;
 }
-.topbar-brand {
-  font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700;
-  letter-spacing: 0.3em; color: var(--muted); text-transform: uppercase;
-}
-.topbar-mode { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); }
-.topbar-mode span {
-  padding: 2px 8px; border: 1px solid var(--border);
-  border-radius: 4px; background: rgba(255,255,255,0.03);
-}
+.topbar-brand { font-family:'Syne',sans-serif; font-size:11px; font-weight:700; letter-spacing:0.3em; color:var(--muted); text-transform:uppercase; }
+.topbar-mode { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); }
+.topbar-mode span { padding:2px 8px; border:1px solid var(--border); border-radius:4px; background:rgba(255,255,255,0.03); }
 
-/* ─── Panel ─── */
+/* Panel */
 #panel {
-  position: fixed; top: 60px; right: 16px; width: 230px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; overflow: hidden; z-index: 10;
-  transform: translateX(calc(100% + 20px));
-  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  position:fixed; top:60px; right:16px; width:240px;
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  overflow:hidden; z-index:10;
+  transform:translateX(calc(100% + 20px));
+  transition:transform 0.45s cubic-bezier(0.16,1,0.3,1);
 }
-#panel.visible { transform: translateX(0); }
+#panel.visible { transform:translateX(0); }
+.panel-header { padding:14px 16px 10px; border-bottom:1px solid var(--border); }
+.panel-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:0.2em; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+.panel-id { font-family:'Syne',sans-serif; font-size:20px; font-weight:800; color:var(--text); line-height:1; word-break:break-all; }
+.panel-body { padding:12px 16px 16px; display:flex; flex-direction:column; gap:8px; }
+.panel-row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.panel-row-label { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); flex-shrink:0; }
+.panel-row-val { font-family:'DM Mono',monospace; font-size:10px; color:var(--text); text-align:right; word-break:break-all; }
+.divider { height:1px; background:var(--border); margin:2px 0; }
+.status-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:4px; font-family:'DM Mono',monospace; font-size:9px; letter-spacing:0.1em; text-transform:uppercase; font-weight:500; }
+.status-badge::before { content:''; display:block; width:5px; height:5px; border-radius:50%; background:currentColor; }
+.s-found   { background:rgba(62,255,160,0.1); color:var(--success); }
+.s-missing { background:rgba(255,92,92,0.1);  color:var(--danger); }
+.s-free    { background:rgba(255,106,0,0.12); color:#ff6a00; }
 
-.panel-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
-.panel-label {
-  font-family: 'DM Mono', monospace; font-size: 9px;
-  letter-spacing: 0.2em; text-transform: uppercase;
-  color: var(--muted); margin-bottom: 6px;
+/* Hint bar — shown when no container selected */
+#hint {
+  position:fixed; bottom:60px; left:50%;
+  transform:translateX(-50%);
+  background:var(--surface); border:1px solid var(--border); border-radius:8px;
+  padding:8px 16px; font-family:'DM Mono',monospace; font-size:10px;
+  color:var(--muted); z-index:10; white-space:nowrap;
+  transition:opacity 0.4s ease;
 }
-.panel-id {
-  font-family: 'Syne', sans-serif; font-size: 22px;
-  font-weight: 800; color: var(--text); line-height: 1; word-break: break-all;
-}
-.panel-body { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
-.panel-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.panel-row-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); flex-shrink: 0; }
-.panel-row-val { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text); text-align: right; word-break: break-all; }
-.divider { height: 1px; background: var(--border); margin: 2px 0; }
+#hint.hidden { opacity:0; pointer-events:none; }
 
-.status-badge {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 8px; border-radius: 4px;
-  font-family: 'DM Mono', monospace; font-size: 9px;
-  letter-spacing: 0.1em; text-transform: uppercase; font-weight: 500;
-}
-.status-badge::before {
-  content: ''; display: block; width: 5px; height: 5px;
-  border-radius: 50%; background: currentColor;
-}
-.s-found   { background: rgba(62,255,160,0.1);  color: var(--success); }
-.s-missing { background: rgba(255,92,92,0.1);   color: var(--danger); }
-
-/* ─── Toast ─── */
+/* Toast */
 #toast {
-  position: fixed; bottom: 20px; left: 50%;
-  transform: translateX(-50%) translateY(60px);
-  background: var(--surface2); border: 1px solid var(--border);
-  border-left: 3px solid var(--danger); border-radius: 8px;
-  padding: 10px 16px; font-family: 'DM Mono', monospace;
-  font-size: 11px; color: var(--text); z-index: 50;
-  transition: transform 0.4s cubic-bezier(0.16,1,0.3,1); white-space: nowrap;
+  position:fixed; bottom:20px; left:50%;
+  transform:translateX(-50%) translateY(60px);
+  background:var(--surface2); border:1px solid var(--border);
+  border-left:3px solid var(--danger); border-radius:8px;
+  padding:10px 16px; font-family:'DM Mono',monospace; font-size:11px; color:var(--text);
+  z-index:50; transition:transform 0.4s cubic-bezier(0.16,1,0.3,1); white-space:nowrap;
 }
-#toast.show { transform: translateX(-50%) translateY(0); }
+#toast.show { transform:translateX(-50%) translateY(0); }
 
-/* ─── Reset ─── */
+/* Reset */
 #btn-reset {
-  position: fixed; bottom: 20px; right: 16px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 8px; padding: 9px 14px;
-  font-family: 'DM Mono', monospace; font-size: 10px;
-  letter-spacing: 0.08em; color: var(--muted);
-  cursor: pointer; z-index: 10; display: none;
-  transition: color 0.2s, border-color 0.2s, background 0.2s;
+  position:fixed; bottom:20px; right:16px;
+  background:var(--surface); border:1px solid var(--border); border-radius:8px;
+  padding:9px 14px; font-family:'DM Mono',monospace; font-size:10px;
+  letter-spacing:0.08em; color:var(--muted); cursor:pointer; z-index:10; display:none;
+  transition:color 0.2s,border-color 0.2s,background 0.2s;
 }
-#btn-reset:hover { color: var(--text); border-color: rgba(255,255,255,0.15); background: var(--surface2); }
-#btn-reset.visible { display: block; }
+#btn-reset:hover { color:var(--text); border-color:rgba(255,255,255,0.15); background:var(--surface2); }
+#btn-reset.visible { display:block; }
 </style>
 </head>
 <body>
@@ -174,6 +145,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
   </div>
 </div>
 
+<div id="hint">🖱 Scroll to zoom · Drag to orbit · Right-drag to pan</div>
 <div id="toast"></div>
 <button id="btn-reset" onclick="resetView()">↩ Show All</button>
 
@@ -184,38 +156,31 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 const CONFIG = {
   glbUrl:            'https://sharifsharifzada.github.io/warehouse-3d-viewer/warehouse-3d-with-textures1.glb',
   secret:            'Birmarket-Secure-2024-Y10G2P7M4',
-  highlightColor:    0xd4ff3e,
-  highlightEmissive: 1.8,      // strong glow even on textured materials
+  highlightColor:    0xff6a00,   // vivid orange — clearly visible on any texture
+  highlightEmissive: 2.5,        // very strong glow
   cameraLerp:        0.055,
-  cameraZoom:        3.5,      // distance = maxDim * this (smaller = closer)
-  cameraMinDist:     0.8,      // allow very close zoom for tiny containers
-  cameraFixedDist:   6,        // hard cap: never further than this from container
+  cameraZoom:        3.5,
+  cameraMinDist:     0.8,
+  cameraFixedDist:   8,
 };
 
 // ══════════════════════════════════════════════════════════════
 //  URL PARAMS
-//  IMPORTANT: Remove &v=Timestamp from your DAX measure!
-//  The timestamp forces a full GLB re-download on every slicer
-//  click. Without it the browser caches the GLB (~once per session).
-//
-//  Safe DAX to use:
-//    VAR FullURL = BaseURL & "?token=" & SecretToken
-//                & IF(SelectedContainerID<>"", "&container=" & EncodedID, "")
 // ══════════════════════════════════════════════════════════════
-const params        = new URLSearchParams(window.location.search);
-const urlContainer  = (params.get('container') || '').trim();
-const urlNodeIndex  = params.get('nodeindex') !== null ? parseInt(params.get('nodeindex')) : -1;
+const params       = new URLSearchParams(window.location.search);
+const urlContainer = (params.get('container') || '').trim();
+const urlNodeIndex = params.get('nodeindex') !== null ? parseInt(params.get('nodeindex')) : -1;
 
 // ══════════════════════════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════════════════════════
 let scene, camera, renderer, controls, model;
-let allMeshes      = [];
-let nodeMap        = new Map();   // exact node name → record
-let nodeIndexMap   = new Map();   // node index (order in traverse) → record
-let highlighted    = null;        // { record, hlMats }
-let camAnimTarget  = null;
-let isAnimating    = false;
+let allMeshes    = [];
+let nodeMap      = new Map();      // exact node name  → record
+let nodeIndexMap = new Map();      // traverse index   → record
+let highlighted  = null;           // { record, hlMats }
+let camAnimTarget = null;
+let isAnimating   = false;
 
 // ══════════════════════════════════════════════════════════════
 //  INIT
@@ -233,19 +198,16 @@ function init() {
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(wrap.clientWidth, wrap.clientHeight);
-  renderer.outputEncoding    = THREE.sRGBEncoding;
-  renderer.toneMapping       = THREE.ACESFilmicToneMapping;
+  renderer.outputEncoding     = THREE.sRGBEncoding;
+  renderer.toneMapping        = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
-  renderer.shadowMap.enabled = false; // off for performance on large model
+  renderer.shadowMap.enabled  = false;
   wrap.appendChild(renderer.domElement);
 
-  // Lights — balanced so original GLB textures read correctly
   scene.add(new THREE.AmbientLight(0xffffff, 0.75));
-
   const sun = new THREE.DirectionalLight(0xfff4e0, 1.0);
   sun.position.set(30, 50, 20);
   scene.add(sun);
-
   const fill = new THREE.DirectionalLight(0xd0e8ff, 0.3);
   fill.position.set(-20, 10, -15);
   scene.add(fill);
@@ -254,12 +216,16 @@ function init() {
   grid.position.y = -0.02;
   scene.add(grid);
 
+  // Controls — always enabled, user can orbit/zoom/pan freely
   controls = new THREE.OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.07;
-  controls.minDistance   = 0.5;
-  controls.maxDistance   = 500;
-  controls.maxPolarAngle = Math.PI * 0.5;
+  controls.enableDamping  = true;
+  controls.dampingFactor  = 0.07;
+  controls.minDistance    = 0.5;
+  controls.maxDistance    = 500;
+  controls.maxPolarAngle  = Math.PI * 0.5;
+  controls.enableZoom     = true;
+  controls.enableRotate   = true;
+  controls.enablePan      = true;
 
   window.addEventListener('resize', onResize);
   loadModel();
@@ -267,7 +233,7 @@ function init() {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  LOAD — no cache-buster on the GLB URL so browser caches it
+//  LOAD
 // ══════════════════════════════════════════════════════════════
 function loadModel() {
   setStatus('Fetching model…');
@@ -279,7 +245,7 @@ function loadModel() {
       if (xhr.lengthComputable) {
         const pct = Math.round((xhr.loaded / xhr.total) * 100);
         setProgress(pct);
-        setStatus(pct < 100 ? `Downloading… ${pct}%` : 'Building scene…');
+        setStatus(pct < 100 ? 'Downloading… ' + pct + '%' : 'Building scene…');
       }
     },
     (err) => { console.error(err); showToast('Model load failed'); hideLoader(); }
@@ -290,32 +256,29 @@ function onLoaded(gltf) {
   setStatus('Preparing nodes…');
   model = gltf.scene;
 
-  let traverseIndex = 0;
+  let ti = 0;
   model.traverse((obj) => {
     if (!obj.isMesh) return;
     obj.frustumCulled = true;
 
-    // Store a reference to the original material(s) — never mutated
-    const origMat = Array.isArray(obj.material)
-      ? obj.material          // multi-material: keep array as-is
-      : obj.material;         // single material
-
-    const record = { node: obj, nodeName: obj.name || '', origMat, nodeIndex: traverseIndex };
+    // Keep reference to original material — NEVER modify origMat directly
+    const origMat = Array.isArray(obj.material) ? obj.material : obj.material;
+    const record  = { node: obj, nodeName: obj.name || '', origMat, nodeIndex: ti };
     allMeshes.push(record);
 
-    const key = obj.name.trim();   // exact, case-preserved
+    const key = obj.name.trim();
     if (key && !nodeMap.has(key)) nodeMap.set(key, record);
-    nodeIndexMap.set(traverseIndex, record);
-    traverseIndex++;
+    nodeIndexMap.set(ti, record);
+    ti++;
   });
 
-  // Centre on ground
+  // Centre model at ground
   const box    = new THREE.Box3().setFromObject(model);
   const center = box.getCenter(new THREE.Vector3());
   model.position.set(-center.x, -box.min.y, -center.z);
   scene.add(model);
 
-  console.log(`✅ ${allMeshes.length} meshes | ${nodeMap.size} named nodes`);
+  console.log('Meshes: ' + allMeshes.length + ' | Named: ' + nodeMap.size);
 
   fitCamera();
   setProgress(100);
@@ -323,13 +286,29 @@ function onLoaded(gltf) {
   setTimeout(() => {
     hideLoader();
     if (urlNodeIndex >= 0) {
+      // A specific container was selected in PBI slicer
       selectByIndex(urlNodeIndex);
     } else if (urlContainer) {
       selectByName(urlContainer);
     } else {
-      setModeLabel('Full View');
+      // No selection — free roam mode
+      setFreeRoamMode();
     }
   }, 250);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  FREE ROAM MODE — no selection, full model, orbit freely
+// ══════════════════════════════════════════════════════════════
+function setFreeRoamMode() {
+  clearHighlight();
+  setModeLabel('Free View — No Selection');
+  document.getElementById('panel').classList.remove('visible');
+  document.getElementById('btn-reset').classList.remove('visible');
+  document.getElementById('hint').classList.remove('hidden');
+
+  // Fit camera to entire model so user sees everything
+  fitCamera();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -338,48 +317,60 @@ function onLoaded(gltf) {
 function selectByIndex(index) {
   const record = nodeIndexMap.get(index);
   clearHighlight();
+  document.getElementById('hint').classList.add('hidden');
+
   if (!record) {
-    showToast(`Node index ${index} not found`);
+    showToast('Node index ' + index + ' not found in model');
     setModeLabel('Not Found');
     updatePanel({ id: String(index), found: false });
     return;
   }
+
   applyHighlight(record);
+
+  // Zoom camera close to this container — full warehouse stays visible
   animateCameraTo(record.node);
-  setModeLabel(`#${index} — ${record.nodeName}`);
-  updatePanel({ id: `#${index} — ${record.nodeName}`, record, found: true, matchType: 'Index' });
+
+  setModeLabel('#' + index + ' — ' + record.nodeName);
+  updatePanel({ id: '#' + index + ' / ' + record.nodeName, record, found: true, matchType: 'Node Index' });
   document.getElementById('btn-reset').classList.add('visible');
 }
 
-// ── by Container ID name (legacy / fallback) ──────────────────
+// ── by Container ID string (fallback) ─────────────────────────
 function selectByName(id) {
   const record = nodeMap.get(id.toString().trim());
   clearHighlight();
+  document.getElementById('hint').classList.add('hidden');
+
   if (!record) {
-    showToast(`Container "${id}" not found`);
+    showToast('Container "' + id + '" not found');
     setModeLabel('Not Found');
     updatePanel({ id, found: false });
     return;
   }
+
   applyHighlight(record);
   animateCameraTo(record.node);
-  setModeLabel(`Container: ${record.nodeName}`);
+  setModeLabel('Container: ' + record.nodeName);
   updatePanel({ id, record, found: true, matchType: 'Exact' });
   document.getElementById('btn-reset').classList.add('visible');
 }
 
-// ── shared highlight ───────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+//  HIGHLIGHT — orange glow on selected, all others unchanged
+// ══════════════════════════════════════════════════════════════
 function applyHighlight(record) {
   const origMats = Array.isArray(record.origMat) ? record.origMat : [record.origMat];
-  const hlMats   = origMats.map(m => {
-    const h = m.clone();
+  const hlMats   = origMats.map(function(m) {
+    var h = m.clone();
     h.color             = new THREE.Color(CONFIG.highlightColor);
     h.emissive          = new THREE.Color(CONFIG.highlightColor);
     h.emissiveIntensity = CONFIG.highlightEmissive;
-    h.map               = null;
+    h.map               = null;   // clear texture so orange is unmissable
     h.needsUpdate       = true;
     return h;
   });
+
   record.node.material    = hlMats.length === 1 ? hlMats[0] : hlMats;
   record.node.renderOrder = 1;
   highlighted = { record, hlMats };
@@ -387,23 +378,17 @@ function applyHighlight(record) {
 
 function clearHighlight() {
   if (!highlighted) return;
-  // Restore original material exactly — textures unchanged
   highlighted.record.node.material    = highlighted.record.origMat;
   highlighted.record.node.renderOrder = 0;
-  // Dispose cloned highlight materials to free GPU memory
-  highlighted.hlMats.forEach(m => m.dispose());
+  highlighted.hlMats.forEach(function(m) { m.dispose(); });
   highlighted = null;
 }
 
 // ══════════════════════════════════════════════════════════════
-//  RESET
+//  RESET — goes back to free roam / full model view
 // ══════════════════════════════════════════════════════════════
-window.resetView = function () {
-  clearHighlight();
-  fitCamera();
-  setModeLabel('Full View');
-  document.getElementById('panel').classList.remove('visible');
-  document.getElementById('btn-reset').classList.remove('visible');
+window.resetView = function() {
+  setFreeRoamMode();
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -415,15 +400,11 @@ function animateCameraTo(obj) {
   const size   = box.getSize(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z, 0.3);
 
-  // Use the smaller of: proportional distance OR fixed close cap
-  // This ensures tiny containers still get a tight zoom
-  const proportional = maxDim * CONFIG.cameraZoom;
   const dist = Math.min(
-    Math.max(proportional, CONFIG.cameraMinDist),
+    Math.max(maxDim * CONFIG.cameraZoom, CONFIG.cameraMinDist),
     CONFIG.cameraFixedDist
   );
 
-  // Approach from a 45° front-right-above angle for clear visibility
   const newPos = new THREE.Vector3(
     center.x + dist * 0.7,
     center.y + dist * 0.6,
@@ -477,7 +458,7 @@ function animate() {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  UI
+//  UI HELPERS
 // ══════════════════════════════════════════════════════════════
 function setProgress(pct) {
   document.getElementById('load-bar').style.width = pct + '%';
@@ -485,7 +466,7 @@ function setProgress(pct) {
 }
 function setStatus(txt)    { document.getElementById('load-status').textContent = txt; }
 function hideLoader()      { document.getElementById('loading').classList.add('hidden'); }
-function setModeLabel(txt) { document.getElementById('mode-label').textContent = txt; }
+function setModeLabel(txt) { document.getElementById('mode-label').textContent  = txt; }
 
 function updatePanel(info) {
   const panel = document.getElementById('panel');
@@ -507,13 +488,13 @@ function updatePanel(info) {
   document.getElementById('panel-match').textContent = info.matchType;
 }
 
-let _toastTimer;
+var _toastTimer;
 function showToast(msg) {
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
+  _toastTimer = setTimeout(function() { el.classList.remove('show'); }, 4000);
 }
 
 function onResize() {
