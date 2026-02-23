@@ -1,297 +1,683 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>Warehouse 3D Viewer</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; background: #f5f5f5; overflow: hidden; }
-        #viewer { width: 100vw; height: 100vh; }
+<meta charset="utf-8">
+<title>Warehouse 3D Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-        #label {
-            position: absolute;
-            top: 16px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.65);
-            color: #fff;
-            padding: 8px 20px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: bold;
-            letter-spacing: 0.5px;
-            display: none;
-            pointer-events: none;
-        }
-    </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+:root {
+  --bg:        #0b0c0e;
+  --surface:   #13151a;
+  --surface2:  #1c1f27;
+  --border:    rgba(255,255,255,0.06);
+  --accent:    #d4ff3e;
+  --accent-dim:#8aaa1c;
+  --text:      #e8e9eb;
+  --muted:     #5a6072;
+  --danger:    #ff5c5c;
+  --success:   #3effa0;
+  --warn:      #ffb23e;
+}
+
+html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); }
+
+/* ─── Canvas ─── */
+#canvas-wrap {
+  position: fixed;
+  inset: 0;
+}
+#canvas-wrap canvas { display: block; width: 100% !important; height: 100% !important; }
+
+/* ─── Loading Screen ─── */
+#loading {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 100;
+  gap: 20px;
+  transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+#loading.hidden { opacity: 0; visibility: hidden; }
+
+.load-logo {
+  font-family: 'Syne', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.35em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.load-bar-wrap {
+  width: 200px; height: 2px;
+  background: var(--surface2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.load-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+.load-pct {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ─── Top bar ─── */
+#topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: linear-gradient(to bottom, rgba(11,12,14,0.95) 0%, rgba(11,12,14,0) 100%);
+  z-index: 10;
+  pointer-events: none;
+}
+.topbar-brand {
+  font-family: 'Syne', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.topbar-mode {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+}
+.topbar-mode span {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.03);
+}
+
+/* ─── Info Panel ─── */
+#panel {
+  position: fixed;
+  top: 60px; right: 16px;
+  width: 240px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  z-index: 10;
+  transform: translateX(calc(100% + 20px));
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+#panel.visible {
+  transform: translateX(0);
+}
+
+.panel-header {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.panel-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.panel-id {
+  font-family: 'Syne', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1;
+  word-break: break-all;
+}
+
+.panel-body { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+
+.panel-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+}
+.panel-row-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+}
+.panel-row-val {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--text);
+  text-align: right;
+  word-break: break-all;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+.status-badge::before {
+  content: '';
+  display: block;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.status-found   { background: rgba(62,255,160,0.1); color: var(--success); }
+.status-missing { background: rgba(255,92,92,0.1);  color: var(--danger); }
+.status-all     { background: rgba(212,255,62,0.1); color: var(--accent);  }
+
+.panel-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+
+/* ─── Error Toast ─── */
+#toast {
+  position: fixed;
+  bottom: 20px; left: 50%;
+  transform: translateX(-50%) translateY(60px);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--danger);
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--text);
+  z-index: 50;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+#toast.show {
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ─── Reset Button ─── */
+#btn-reset {
+  position: fixed;
+  bottom: 20px; right: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  cursor: pointer;
+  z-index: 10;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+  display: none;
+}
+#btn-reset:hover {
+  color: var(--text);
+  border-color: rgba(255,255,255,0.15);
+  background: var(--surface2);
+}
+#btn-reset.visible { display: block; }
+
+/* ─── Crosshair pulse (selected) ─── */
+@keyframes pulse-ring {
+  0%   { transform: scale(0.8); opacity: 0.8; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+</style>
 </head>
 <body>
-    <div id="viewer"></div>
-    <div id="label"></div>
 
-    <script>
-        // ─── Container Mapping ───────────────────────────────────────────────
-        // name        → must match the ?container= value sent from Power BI
-        // materialName → must match the material name inside your GLB file
-        // color        → highlight color for that container
-        const CSV_CONTAINERS = [
-            { name: 'Container_Red',    materialName: 'test1', color: 0xff3333 },
-            { name: 'Container_Green',  materialName: 'test2', color: 0x33dd33 },
-            { name: 'Container_Blue',   materialName: 'test3', color: 0x3399ff },
-            { name: 'Container_Purple', materialName: 'test',  color: 0xaa44ff },
-            { name: 'Container_Cyan',   materialName: 'test',  color: 0x00eeff }
-        ];
-        // ────────────────────────────────────────────────────────────────────
+<div id="canvas-wrap"></div>
 
-        function getURLParameter(name) {
-            return new URLSearchParams(window.location.search).get(name);
-        }
+<!-- Loading -->
+<div id="loading">
+  <div class="load-logo">Warehouse Viewer</div>
+  <div class="load-bar-wrap"><div class="load-bar" id="load-bar"></div></div>
+  <div class="load-pct" id="load-pct">0%</div>
+</div>
 
-        const urlSelectedContainer = getURLParameter('container');
-        console.log('🎯 Selected container from URL:', urlSelectedContainer);
+<!-- Top bar -->
+<div id="topbar">
+  <div class="topbar-brand">Birmarket WH</div>
+  <div class="topbar-mode"><span id="mode-label">Loading…</span></div>
+</div>
 
-        let scene, camera, renderer, controls;
-        let model = null;
-        let primitives = [];
+<!-- Info panel -->
+<div id="panel">
+  <div class="panel-header">
+    <div class="panel-label">Container</div>
+    <div class="panel-id" id="panel-id">—</div>
+  </div>
+  <div class="panel-body">
+    <div class="panel-row">
+      <span class="panel-row-label">Status</span>
+      <span id="panel-status" class="status-badge status-found">Found</span>
+    </div>
+    <div class="panel-divider"></div>
+    <div class="panel-row">
+      <span class="panel-row-label">Node</span>
+      <span class="panel-row-val" id="panel-node">—</span>
+    </div>
+    <div class="panel-row">
+      <span class="panel-row-label">Mesh</span>
+      <span class="panel-row-val" id="panel-mesh">—</span>
+    </div>
+    <div class="panel-row">
+      <span class="panel-row-label">Match</span>
+      <span class="panel-row-val" id="panel-match">Exact</span>
+    </div>
+  </div>
+</div>
 
-        function init() {
-            const container = document.getElementById('viewer');
+<!-- Toast -->
+<div id="toast" id="toast"></div>
 
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xf0f0f0);
+<!-- Reset -->
+<button id="btn-reset" onclick="resetView()">↩ Show All</button>
 
-            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(8, 6, 8);
+<script>
+// ══════════════════════════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════════════════════════
+const CONFIG = {
+  glbUrl: 'https://sharifsharifzada.github.io/warehouse-3d-viewer/warehouse-3d-with-textures1.glb',
+  secret: 'Birmarket-Secure-2024-Y10G2P7M4',
+  highlightColor: 0xd4ff3e,
+  dimColor: 0x1a1d26,
+  dimOpacity: 0.08,
+  cameraLerpSpeed: 0.05,       // 0..1 — lower = smoother/slower
+  cameraZoomFactor: 2.2,       // multiplier of bounding box size for camera distance
+  cameraMinDist: 1.5,
+};
 
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.shadowMap.enabled = true;
-            container.appendChild(renderer.domElement);
+// ══════════════════════════════════════════════════════════════
+//  URL PARAMS
+// ══════════════════════════════════════════════════════════════
+const params      = new URLSearchParams(window.location.search);
+const urlToken    = params.get('token')    || '';
+const urlContainer = params.get('container') || '';
 
-            // Lights
-            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-            const dir1 = new THREE.DirectionalLight(0xffffff, 0.9);
-            dir1.position.set(10, 15, 5);
-            dir1.castShadow = true;
-            scene.add(dir1);
-            const dir2 = new THREE.DirectionalLight(0xffffff, 0.3);
-            dir2.position.set(-10, 5, -5);
-            scene.add(dir2);
+const tokenOk = urlToken === CONFIG.secret;
+if (!tokenOk) {
+  console.warn('⚠️ Token mismatch — proceeding in demo mode');
+}
 
-            // Ground
-            const ground = new THREE.Mesh(
-                new THREE.PlaneGeometry(30, 30),
-                new THREE.MeshStandardMaterial({ color: 0xdddddd })
-            );
-            ground.rotation.x = -Math.PI / 2;
-            ground.receiveShadow = true;
-            scene.add(ground);
-            scene.add(new THREE.GridHelper(30, 30, 0xcccccc, 0xe0e0e0));
+// ══════════════════════════════════════════════════════════════
+//  SCENE STATE
+// ══════════════════════════════════════════════════════════════
+let scene, camera, renderer, controls, model;
+let allMeshes     = [];   // { node: Object3D, nodeName: string, meshName: string, origMats: Material[] }
+let nodeMap       = new Map(); // nodeName (lowercase) -> mesh record
 
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.08;
-            controls.minDistance = 1;
-            controls.maxDistance = 200;
+let camTarget     = new THREE.Vector3();
+let camPos        = new THREE.Vector3();
+let animating     = false;
 
-            loadGLB();
-            animate();
-            window.addEventListener('resize', onResize);
-        }
+let selectedNodeName = '';
 
-        function loadGLB() {
-            const loader = new THREE.GLTFLoader();
-            const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/WareHouseIDTest_05.glb';
-            console.log('📦 Loading GLB:', glbUrl);
+// ══════════════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════════════
+function init() {
+  const wrap = document.getElementById('canvas-wrap');
 
-            loader.load(
-                glbUrl,
-                (gltf) => {
-                    console.log('✅ GLB loaded successfully');
-                    model = gltf.scene;
-                    scene.add(model);
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0b0c0e);
+  scene.fog = new THREE.FogExp2(0x0b0c0e, 0.018);
 
-                    // Centre the model on the ground
-                    const box = new THREE.Box3().setFromObject(model);
-                    const center = box.getCenter(new THREE.Vector3());
-                    const size   = box.getSize(new THREE.Vector3());
-                    model.position.set(-center.x, -center.y + size.y / 2, -center.z);
+  camera = new THREE.PerspectiveCamera(45, wrap.clientWidth / wrap.clientHeight, 0.1, 1000);
+  camera.position.set(14, 10, 14);
 
-                    extractPrimitives();
-                    fitCamera(); // always start with full-warehouse view
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
+  wrap.appendChild(renderer.domElement);
 
-                    if (urlSelectedContainer) {
-                        setTimeout(() => highlightContainer(urlSelectedContainer), 300);
-                    }
-                },
-                (xhr) => {
-                    if (xhr.total) console.log(`Loading: ${Math.round(xhr.loaded / xhr.total * 100)}%`);
-                },
-                (error) => {
-                    console.error('❌ GLB load error:', error);
-                }
-            );
-        }
+  // Lights
+  const ambLight = new THREE.AmbientLight(0xffffff, 0.6);
+  scene.add(ambLight);
 
-        function extractPrimitives() {
-            let idx = 0;
-            model.traverse((child) => {
-                if (!child.isMesh) return;
-                const mats = Array.isArray(child.material) ? child.material : [child.material];
-                mats.forEach((mat, mi) => {
-                    primitives.push({
-                        primitiveID:      idx++,
-                        mesh:             child,
-                        materialIndex:    Array.isArray(child.material) ? mi : -1,
-                        materialName:     mat.name || 'Unnamed',
-                        meshName:         child.name || 'Unnamed',
-                        originalMaterial: mat.clone()
-                    });
-                });
-            });
-            console.log(`✅ Extracted ${primitives.length} primitives`);
-            primitives.forEach(p =>
-                console.log(`  [${p.primitiveID}] mesh="${p.meshName}" material="${p.materialName}"`)
-            );
-        }
+  const dirLight = new THREE.DirectionalLight(0xfff5e0, 1.2);
+  dirLight.position.set(20, 30, 15);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.set(1024, 1024);
+  scene.add(dirLight);
 
-        // ─── HIGHLIGHT: keeps whole model visible, dims others, glows selected ──
-        function highlightContainer(containerName) {
-            console.log('\n═══════════════════════════════');
-            console.log('🎯 Highlighting:', containerName);
+  const fillLight = new THREE.DirectionalLight(0xc8d8ff, 0.4);
+  fillLight.position.set(-15, 8, -10);
+  scene.add(fillLight);
 
-            const containerCfg = CSV_CONTAINERS.find(c => c.name === containerName);
-            if (!containerCfg) {
-                console.warn('❌ Container not found in CSV_CONTAINERS mapping:', containerName);
-                resetAllPrimitives();
-                return;
-            }
+  // Ground grid
+  const grid = new THREE.GridHelper(60, 60, 0x1a1d26, 0x151720);
+  grid.position.y = -0.01;
+  scene.add(grid);
 
-            const matchingPrim = primitives.find(p => p.materialName === containerCfg.materialName);
-            if (!matchingPrim) {
-                console.warn('❌ No GLB primitive with materialName:', containerCfg.materialName);
-                resetAllPrimitives();
-                return;
-            }
+  // Controls
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 0.5;
+  controls.maxDistance = 200;
+  controls.maxPolarAngle = Math.PI * 0.5;
 
-            console.log(`✅ Match → primitive #${matchingPrim.primitiveID}, mesh="${matchingPrim.meshName}"`);
+  window.addEventListener('resize', onResize);
 
-            // 1. Make sure every mesh is visible (full warehouse)
-            primitives.forEach(p => { p.mesh.visible = true; });
+  loadModel();
+  animate();
+}
 
-            // 2. Dim non-selected primitives (greyed out, semi-transparent)
-            const dimMat = new THREE.MeshStandardMaterial({
-                color:       0xaaaaaa,
-                transparent: true,
-                opacity:     0.25,
-                roughness:   1.0,
-                metalness:   0.0
-            });
+// ══════════════════════════════════════════════════════════════
+//  MODEL LOAD
+// ══════════════════════════════════════════════════════════════
+function loadModel() {
+  const loader = new THREE.GLTFLoader();
+  loader.load(
+    CONFIG.glbUrl,
+    onGLBLoaded,
+    (xhr) => {
+      if (xhr.lengthComputable) {
+        const pct = Math.round((xhr.loaded / xhr.total) * 100);
+        setLoadProgress(pct);
+      }
+    },
+    (err) => {
+      console.error('GLB load error:', err);
+      showToast('Failed to load model');
+      hideLoader();
+    }
+  );
+}
 
-            primitives.forEach(p => {
-                if (p === matchingPrim) return; // skip selected
-                if (p.materialIndex >= 0) {
-                    p.mesh.material[p.materialIndex] = dimMat.clone();
-                } else {
-                    p.mesh.material = dimMat.clone();
-                }
-            });
+function onGLBLoaded(gltf) {
+  model = gltf.scene;
+  scene.add(model);
 
-            // 3. Apply glowing highlight to selected container
-            const highlightMat = new THREE.MeshStandardMaterial({
-                color:            containerCfg.color,
-                emissive:         containerCfg.color,
-                emissiveIntensity: 0.7,
-                roughness:        0.2,
-                metalness:        0.5
-            });
+  // Centre model on ground
+  const box = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  model.position.set(-center.x, -box.min.y, -center.z);
 
-            if (matchingPrim.materialIndex >= 0) {
-                matchingPrim.mesh.material[matchingPrim.materialIndex] = highlightMat;
-            } else {
-                matchingPrim.mesh.material = highlightMat;
-            }
+  // Collect all mesh nodes
+  model.traverse((obj) => {
+    if (obj.isMesh) {
+      const nodeName = obj.name || '';
+      const meshName = obj.geometry ? (obj.geometry.name || nodeName) : nodeName;
+      const origMats = Array.isArray(obj.material)
+        ? obj.material.map(m => m.clone())
+        : [obj.material.clone()];
 
-            // 4. Show label
-            const labelEl = document.getElementById('label');
-            labelEl.textContent = '📦 ' + containerName;
-            labelEl.style.display = 'block';
-            labelEl.style.borderLeft = '4px solid #' + containerCfg.color.toString(16).padStart(6, '0');
+      const record = { node: obj, nodeName, meshName, origMats };
+      allMeshes.push(record);
 
-            // 5. Camera: zoom in on selected container but keep warehouse context
-            //    Pull back enough to see the whole warehouse, angled toward the target
-            const selBox    = new THREE.Box3().setFromObject(matchingPrim.mesh);
-            const selCenter = selBox.getCenter(new THREE.Vector3());
-            const selSize   = selBox.getSize(new THREE.Vector3());
-            const selMaxDim = Math.max(selSize.x, selSize.y, selSize.z);
+      // Map by lowercase node name for flexible lookup
+      const key = nodeName.toLowerCase().trim();
+      if (key && !nodeMap.has(key)) {
+        nodeMap.set(key, record);
+      }
+    }
+  });
 
-            // Use full-model box for context distance
-            const fullBox    = new THREE.Box3().setFromObject(model);
-            const fullSize   = fullBox.getSize(new THREE.Vector3());
-            const fullMaxDim = Math.max(fullSize.x, fullSize.y, fullSize.z);
+  console.log(`✅ Loaded ${allMeshes.length} mesh nodes`);
+  console.log(`🗺️ Node map: ${nodeMap.size} unique names`);
 
-            // Camera sits at a "medium" distance: close enough to see the highlight,
-            // far enough to show the whole warehouse around it
-            const dist = Math.max(selMaxDim * 3, fullMaxDim * 0.8);
+  fitCameraToModel();
+  setLoadProgress(100);
+  hideLoader();
 
-            camera.position.set(
-                selCenter.x + dist * 0.55,
-                selCenter.y + dist * 0.60,
-                selCenter.z + dist * 0.55
-            );
-            camera.lookAt(selCenter);
-            controls.target.copy(selCenter);
-            controls.update();
+  // Auto-select from URL
+  if (urlContainer) {
+    setTimeout(() => selectContainer(urlContainer), 200);
+  } else {
+    setModeLabel('Full View');
+    updatePanel(null);
+  }
+}
 
-            console.log('🎨 Color:', '#' + containerCfg.color.toString(16).padStart(6,'0'));
-            console.log('📷 Camera positioned with full-warehouse context');
-            console.log('═══════════════════════════════\n');
-        }
+// ══════════════════════════════════════════════════════════════
+//  CONTAINER SELECTION
+// ══════════════════════════════════════════════════════════════
+function selectContainer(id) {
+  const key = id.toString().toLowerCase().trim();
+  let record = nodeMap.get(key);
+  let matchType = 'Exact';
 
-        function resetAllPrimitives() {
-            console.log('🔄 Resetting all to original materials');
-            document.getElementById('label').style.display = 'none';
+  // Fuzzy fallback: try partial match
+  if (!record) {
+    for (const [k, v] of nodeMap) {
+      if (k.includes(key) || key.includes(k)) {
+        record = v;
+        matchType = 'Partial';
+        break;
+      }
+    }
+  }
 
-            primitives.forEach(p => {
-                p.mesh.visible = true;
-                if (p.materialIndex >= 0) {
-                    p.mesh.material[p.materialIndex] = p.originalMaterial.clone();
-                } else {
-                    p.mesh.material = p.originalMaterial.clone();
-                }
-            });
+  if (!record) {
+    console.warn(`❌ Container not found: "${id}"`);
+    setModeLabel('Not Found');
+    updatePanel({ id, found: false });
+    showToast(`Container "${id}" not found in model`);
+    resetMaterials();
+    return;
+  }
 
-            fitCamera();
-        }
+  selectedNodeName = record.nodeName;
+  console.log(`✅ Found: "${record.nodeName}" (${matchType})`);
 
-        function fitCamera() {
-            if (!model) return;
-            const box    = new THREE.Box3().setFromObject(model);
-            const center = box.getCenter(new THREE.Vector3());
-            const size   = box.getSize(new THREE.Vector3());
-            const dist   = Math.max(size.x, size.y, size.z) * 2.2;
-            camera.position.set(center.x + dist * 0.7, center.y + dist * 0.6, center.z + dist * 0.7);
-            camera.lookAt(center);
-            controls.target.copy(center);
-            controls.update();
-        }
+  applyHighlight(record);
+  animateCameraTo(record.node);
+  setModeLabel(`Container: ${record.nodeName}`);
+  updatePanel({ id, record, found: true, matchType });
+  document.getElementById('btn-reset').classList.add('visible');
+}
 
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
-        }
+function applyHighlight(targetRecord) {
+  const highlightMat = new THREE.MeshStandardMaterial({
+    color: CONFIG.highlightColor,
+    emissive: new THREE.Color(CONFIG.highlightColor),
+    emissiveIntensity: 0.5,
+    roughness: 0.3,
+    metalness: 0.2,
+  });
 
-        function onResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
+  const dimMat = new THREE.MeshStandardMaterial({
+    color: CONFIG.dimColor,
+    transparent: true,
+    opacity: CONFIG.dimOpacity,
+    roughness: 1,
+    metalness: 0,
+  });
 
-        window.addEventListener('load', init);
-    </script>
+  allMeshes.forEach(({ node, origMats }) => {
+    if (node === targetRecord.node) {
+      // Highlight
+      node.material = highlightMat;
+      node.renderOrder = 1;
+    } else {
+      // Dim others
+      node.material = dimMat;
+    }
+  });
+}
+
+function resetMaterials() {
+  allMeshes.forEach(({ node, origMats }) => {
+    node.material = origMats.length === 1 ? origMats[0] : origMats;
+  });
+  selectedNodeName = '';
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RESET
+// ══════════════════════════════════════════════════════════════
+window.resetView = function() {
+  resetMaterials();
+  fitCameraToModel();
+  setModeLabel('Full View');
+  updatePanel(null);
+  document.getElementById('btn-reset').classList.remove('visible');
+  document.getElementById('panel').classList.remove('visible');
+};
+
+// ══════════════════════════════════════════════════════════════
+//  CAMERA ANIMATION
+// ══════════════════════════════════════════════════════════════
+let camAnimTarget = null; // { position, lookAt }
+
+function animateCameraTo(obj) {
+  const box = new THREE.Box3().setFromObject(obj);
+  const center = box.getCenter(new THREE.Vector3());
+  const size   = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const dist   = Math.max(maxDim * CONFIG.cameraZoomFactor, CONFIG.cameraMinDist);
+
+  // Approach from current camera direction but at correct distance
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  const newPos = center.clone().add(dir.multiplyScalar(dist));
+  newPos.y = Math.max(newPos.y, center.y + dist * 0.4);
+
+  camAnimTarget = {
+    position: newPos,
+    lookAt: center.clone(),
+  };
+  animating = true;
+}
+
+function fitCameraToModel() {
+  if (!model) return;
+  const box = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  const size   = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const dist   = maxDim * 1.6;
+
+  camAnimTarget = {
+    position: new THREE.Vector3(center.x + dist * 0.7, center.y + dist * 0.5, center.z + dist * 0.7),
+    lookAt: center.clone(),
+  };
+  animating = true;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ANIMATE LOOP
+// ══════════════════════════════════════════════════════════════
+function animate() {
+  requestAnimationFrame(animate);
+
+  if (animating && camAnimTarget) {
+    camera.position.lerp(camAnimTarget.position, CONFIG.cameraLerpSpeed);
+    controls.target.lerp(camAnimTarget.lookAt, CONFIG.cameraLerpSpeed);
+
+    const posDiff = camera.position.distanceTo(camAnimTarget.position);
+    const tgtDiff = controls.target.distanceTo(camAnimTarget.lookAt);
+    if (posDiff < 0.01 && tgtDiff < 0.01) {
+      camera.position.copy(camAnimTarget.position);
+      controls.target.copy(camAnimTarget.lookAt);
+      animating = false;
+    }
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  UI HELPERS
+// ══════════════════════════════════════════════════════════════
+function setLoadProgress(pct) {
+  document.getElementById('load-bar').style.width = pct + '%';
+  document.getElementById('load-pct').textContent = pct + '%';
+}
+
+function hideLoader() {
+  setTimeout(() => {
+    document.getElementById('loading').classList.add('hidden');
+  }, 400);
+}
+
+function setModeLabel(text) {
+  document.getElementById('mode-label').textContent = text;
+}
+
+function updatePanel(info) {
+  const panel = document.getElementById('panel');
+
+  if (!info) {
+    panel.classList.remove('visible');
+    return;
+  }
+
+  panel.classList.add('visible');
+
+  document.getElementById('panel-id').textContent = info.id || '—';
+
+  const statusEl = document.getElementById('panel-status');
+
+  if (!info.found) {
+    statusEl.className = 'status-badge status-missing';
+    statusEl.textContent = 'Not Found';
+    document.getElementById('panel-node').textContent = '—';
+    document.getElementById('panel-mesh').textContent = '—';
+    document.getElementById('panel-match').textContent = '—';
+    return;
+  }
+
+  statusEl.className = 'status-badge status-found';
+  statusEl.textContent = 'Located';
+  document.getElementById('panel-node').textContent = info.record.nodeName || '—';
+  document.getElementById('panel-mesh').textContent = info.record.meshName || '—';
+  document.getElementById('panel-match').textContent = info.matchType || 'Exact';
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+function onResize() {
+  const wrap = document.getElementById('canvas-wrap');
+  camera.aspect = wrap.clientWidth / wrap.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  START
+// ══════════════════════════════════════════════════════════════
+window.addEventListener('load', init);
+</script>
 </body>
 </html>
