@@ -13,14 +13,6 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
   --bg:#0b0c0e;
-  --surface:#13151a;
-  --surface2:#1c1f27;
-  --border:rgba(255,255,255,0.06);
-  --accent:#ff6a00;
-  --text:#e8e9eb;
-  --muted:#5a6072;
-  --danger:#ff5c5c;
-  --success:#3effa0;
 }
 html, body { width:100%; height:100%; overflow:hidden; background:var(--bg); }
 #canvas-wrap { position:fixed; inset:0; }
@@ -29,33 +21,26 @@ html, body { width:100%; height:100%; overflow:hidden; background:var(--bg); }
 </head>
 
 <body>
-
 <div id="canvas-wrap"></div>
 
 <script>
 
-// CONFIG
 const CONFIG = {
   glbUrl:'https://sharifsharifzada.github.io/warehouse-3d-viewer/warehouse-3d-with-textures1.glb',
-  highlightColor:0x00ffff,     // Bright Cyan (high visibility)
-  highlightEmissive:4.0,      // Strong glow
   cameraLerp:0.08,
   cameraZoom:2.0,
   cameraMinDist:0.3,
   cameraMaxDist:50
 };
 
-// URL PARAMS
 const params=new URLSearchParams(window.location.search);
 const urlNodeIndex=params.get('nodeindex')!==null?parseInt(params.get('nodeindex')):-1;
 
-// STATE
 let scene,camera,renderer,controls,model;
 let nodeIndexMap=new Map();
 let highlighted=null;
 let camAnimTarget=null;
 let isAnimating=false;
-let pulseTime=0;
 
 // INIT
 function init(){
@@ -80,8 +65,6 @@ function init(){
   controls=new THREE.OrbitControls(camera,renderer.domElement);
   controls.enableDamping=true;
   controls.dampingFactor=0.07;
-  controls.minDistance=0.2;
-  controls.maxDistance=500;
 
   window.addEventListener('resize',onResize);
   loadModel();
@@ -98,15 +81,14 @@ function loadModel(){
 
     model.traverse(obj=>{
       if(!obj.isMesh)return;
-      nodeIndexMap.set(index,{
-        node:obj,
-        origMat:obj.material
-      });
+      nodeIndexMap.set(index,{ node:obj, origMat:obj.material });
       index++;
     });
 
     scene.add(model);
-    fitCamera();
+
+    // DEFAULT VIEW (CLOSER)
+    fitCameraCloser();
 
     if(urlNodeIndex>=0){
       selectByIndex(urlNodeIndex);
@@ -120,46 +102,33 @@ function selectByIndex(index){
   const record=nodeIndexMap.get(index);
   if(!record)return;
 
-  clearHighlight();
-  applyHighlight(record);
   animateCameraTo(record.node);
 }
 
-// HIGHLIGHT
-function applyHighlight(record){
-  const orig=Array.isArray(record.origMat)?record.origMat:[record.origMat];
-  const hl=orig.map(m=>{
-    const h=m.clone();
-    h.color=new THREE.Color(CONFIG.highlightColor);
-    h.emissive=new THREE.Color(CONFIG.highlightColor);
-    h.emissiveIntensity=CONFIG.highlightEmissive;
-    h.map=null;
-    return h;
-  });
+// DEFAULT CLOSER VIEW
+function fitCameraCloser(){
+  if(!model)return;
 
-  record.node.material=hl.length===1?hl[0]:hl;
-  record.node.renderOrder=1;
+  const box=new THREE.Box3().setFromObject(model);
+  const center=box.getCenter(new THREE.Vector3());
+  const size=box.getSize(new THREE.Vector3());
 
-  // Slight scale increase
-  record.node.scale.set(1.15,1.15,1.15);
+  // 👇 REDUCED distance multiplier (was 1.5 before)
+  const dist=Math.max(size.x,size.y,size.z)*0.9;
 
-  highlighted={record,hl};
+  camAnimTarget={
+    position:new THREE.Vector3(
+      center.x+dist*0.6,
+      center.y+dist*0.45,
+      center.z+dist*0.6
+    ),
+    lookAt:center.clone()
+  };
+
+  isAnimating=true;
 }
 
-function clearHighlight(){
-  if(!highlighted)return;
-
-  highlighted.record.node.material=highlighted.record.origMat;
-  highlighted.record.node.renderOrder=0;
-
-  // Reset scale
-  highlighted.record.node.scale.set(1,1,1);
-
-  highlighted.hl.forEach(m=>m.dispose());
-  highlighted=null;
-}
-
-// CAMERA FOCUS
+// CAMERA FOCUS ON NODE
 function animateCameraTo(obj){
   const box=new THREE.Box3().setFromObject(obj);
   const center=box.getCenter(new THREE.Vector3());
@@ -171,32 +140,15 @@ function animateCameraTo(obj){
     CONFIG.cameraMaxDist
   );
 
-  const newPos=new THREE.Vector3(
-    center.x+dist*0.7,
-    center.y+dist*0.6,
-    center.z+dist*0.7
-  );
-
-  camAnimTarget={position:newPos,lookAt:center.clone()};
-  isAnimating=true;
-}
-
-// FIT FULL MODEL
-function fitCamera(){
-  if(!model)return;
-  const box=new THREE.Box3().setFromObject(model);
-  const center=box.getCenter(new THREE.Vector3());
-  const size=box.getSize(new THREE.Vector3());
-  const dist=Math.max(size.x,size.y,size.z)*1.5;
-
   camAnimTarget={
     position:new THREE.Vector3(
       center.x+dist*0.7,
-      center.y+dist*0.5,
+      center.y+dist*0.6,
       center.z+dist*0.7
     ),
     lookAt:center.clone()
   };
+
   isAnimating=true;
 }
 
@@ -211,13 +163,6 @@ function animate(){
     if(camera.position.distanceTo(camAnimTarget.position)<0.02){
       isAnimating=false;
     }
-  }
-
-  // Pulse animation
-  if(highlighted){
-    pulseTime+=0.08;
-    const pulse=1.15+Math.sin(pulseTime)*0.05;
-    highlighted.record.node.scale.set(pulse,pulse,pulse);
   }
 
   controls.update();
