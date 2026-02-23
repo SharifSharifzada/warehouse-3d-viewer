@@ -2,138 +2,71 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Warehouse 3D Viewer - Secure</title>
+    <title>Warehouse 3D Viewer - Fixed Close Zoom</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { overflow: hidden; background: #f5f5f5; font-family: Arial, sans-serif; }
+        body { font-family: Arial, sans-serif; background: #f5f5f5; overflow: hidden; }
         #viewer { width: 100vw; height: 100vh; }
-        #access-denied {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            z-index: 9999;
-        }
-        #access-denied h1 {
-            font-size: 48px;
-            margin-bottom: 20px;
-        }
-        #access-denied p {
-            font-size: 18px;
-            opacity: 0.8;
-        }
-        .lock-icon {
-            font-size: 100px;
-            margin-bottom: 30px;
-        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
-    <div id="access-denied">
-        <div class="lock-icon">🔒</div>
-        <h1>Access Denied</h1>
-        <p>Unauthorized access to this resource</p>
-    </div>
     <div id="viewer"></div>
 
     <script>
-        // ⚠️ CHANGE THIS TO YOUR SECRET TOKEN
-        const ACCESS_TOKEN = 'Birmarket-Secure-2024-Y10G2P7M4';
-        
-        // Get URL parameters
+        // Container mapping - UPDATE WITH YOUR ACTUAL CONTAINER NAMES
+        const CSV_CONTAINERS = [
+            { name: 'Container_Red', materialName: 'test1', color: 0xff0000 },
+            { name: 'Container_Green', materialName: 'test2', color: 0x00ff00 },
+            { name: 'Container_Blue', materialName: 'test3', color: 0x0000ff },
+            { name: 'Container_Purple', materialName: 'test', color: 0x800080 },
+            { name: 'Container_Cyan', materialName: 'test', color: 0x00ffff }
+        ];
+
         function getURLParameter(name) {
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get(name);
         }
-        
-        // Validate access token
-        function validateAccess() {
-            const providedToken = getURLParameter('token');
-            
-            if (providedToken !== ACCESS_TOKEN) {
-                console.error('🚫 Access denied - invalid token');
-                document.getElementById('access-denied').style.display = 'flex';
-                document.getElementById('viewer').style.display = 'none';
-                return false;
-            }
-            
-            console.log('✅ Access granted');
-            return true;
-        }
-        
-        // Check access before loading
-        if (!validateAccess()) {
-            throw new Error('Unauthorized');
-        }
-        
-        // Get selected container from URL
+
         const urlSelectedContainer = getURLParameter('container');
-        console.log('🎯 Selected container from Power BI:', urlSelectedContainer);
+        console.log('🎯 Selected container:', urlSelectedContainer);
 
-        // Global variables
         let scene, camera, renderer, controls;
-        let model, allObjects = [];
+        let model = null;
+        let primitives = [];
         let glbLoaded = false;
-        let pendingSelection = urlSelectedContainer;
-        let originalMaterials = new Map();
 
-        // Initialize 3D scene
         function init() {
+            const container = document.getElementById('viewer');
+            
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xf5f5f5);
             
             camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(50, 40, 50);
+            camera.position.set(8, 6, 8);
             
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.shadowMap.enabled = true;
-            document.getElementById('viewer').appendChild(renderer.domElement);
+            container.appendChild(renderer.domElement);
             
-            // Lighting setup
             scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-            
-            const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.7);
-            dirLight1.position.set(100, 100, 50);
-            dirLight1.castShadow = true;
+            const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight1.position.set(10, 10, 5);
             scene.add(dirLight1);
             
-            const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
-            dirLight2.position.set(-100, 50, -100);
-            scene.add(dirLight2);
-            
-            const dirLight3 = new THREE.DirectionalLight(0xffffff, 0.3);
-            dirLight3.position.set(0, 50, 100);
-            scene.add(dirLight3);
-            
-            // Ground plane
             const ground = new THREE.Mesh(
-                new THREE.PlaneGeometry(500, 500),
+                new THREE.PlaneGeometry(20, 20),
                 new THREE.MeshStandardMaterial({ color: 0xdddddd })
             );
             ground.rotation.x = -Math.PI / 2;
-            ground.receiveShadow = true;
             scene.add(ground);
             
-            // Grid helper
-            scene.add(new THREE.GridHelper(500, 100, 0xcccccc, 0xe0e0e0));
+            scene.add(new THREE.GridHelper(20, 20, 0xcccccc, 0xe0e0e0));
             
-            // Camera controls
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-            controls.minDistance = 5;
-            controls.maxDistance = 500;
             
             loadGLB();
             animate();
@@ -141,287 +74,196 @@
             window.addEventListener('resize', onResize);
         }
 
-        // Load 3D model
         function loadGLB() {
             const loader = new THREE.GLTFLoader();
-            const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/warehouse-3d-with-textures1.glb';
+            const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/WareHouseIDTest_05.glb';
             
-            console.log('📦 Loading warehouse GLB with textures...');
+            console.log('📦 Loading:', glbUrl);
             
             loader.load(
                 glbUrl,
                 (gltf) => {
-                    console.log('✅ GLB Loaded Successfully!');
+                    console.log('✅ GLB Loaded');
                     
                     model = gltf.scene;
                     scene.add(model);
                     
-                    // Center the model
                     const box = new THREE.Box3().setFromObject(model);
                     const center = box.getCenter(new THREE.Vector3());
                     const size = box.getSize(new THREE.Vector3());
-                    model.position.set(-center.x, -box.min.y, -center.z);
+                    model.position.set(-center.x, -center.y + size.y/2, -center.z);
                     
-                    console.log('═══ SCANNING WAREHOUSE ═══');
-                    
-                    // Collect all objects with their IDs
-                    let numericObjects = 0;
-                    model.traverse((child) => {
-                        // Extract numeric ID from object name (e.g., "1234" or "1234.001")
-                        const match = child.name?.match(/^(\d+)(?:\.(\d+))?$/);
-                        const numericId = match ? parseInt(match[1]) : null;
-                        
-                        allObjects.push({
-                            object: child,
-                            name: child.name || '',
-                            uuid: child.uuid,
-                            type: child.type,
-                            numericId: numericId
-                        });
-                        
-                        if (numericId !== null) {
-                            numericObjects++;
-                        }
-                        
-                        // Store original materials for later reset
-                        if (child.isMesh) {
-                            if (Array.isArray(child.material)) {
-                                child.material.forEach((mat, idx) => {
-                                    originalMaterials.set(`${child.uuid}_${idx}`, mat.clone());
-                                });
-                            } else {
-                                originalMaterials.set(child.uuid, child.material.clone());
-                            }
-                        }
-                    });
-                    
-                    console.log(`Objects with numeric IDs: ${numericObjects}`);
-                    
-                    // Make sure all objects are visible initially
-                    allObjects.forEach(item => {
-                        if (item.object.isMesh || item.object.isGroup || item.object.isObject3D) {
-                            item.object.visible = true;
-                        }
-                    });
-                    
+                    extractPrimitives();
                     fitCamera();
+                    
                     glbLoaded = true;
                     
-                    // Apply pending selection if any
-                    if (pendingSelection) {
-                        setTimeout(() => selectContainer(pendingSelection), 500);
+                    // Auto-select if URL parameter exists
+                    if (urlSelectedContainer) {
+                        setTimeout(() => autoSelect(urlSelectedContainer), 300);
                     } else {
-                        console.log('📦 No selection - showing full warehouse');
+                        console.log('📦 No selection - showing full model');
                     }
                 },
-                (xhr) => {
-                    const percent = (xhr.loaded / xhr.total * 100).toFixed(0);
-                    console.log(`Loading: ${percent}%`);
-                },
+                null,
                 (error) => {
                     console.error('❌ Error loading GLB:', error);
                 }
             );
         }
 
-        // Select and highlight a specific container
-        function selectContainer(containerIdentifier) {
-            if (!glbLoaded) {
-                console.log('⏳ Model not loaded yet, pending selection:', containerIdentifier);
-                pendingSelection = containerIdentifier;
-                return;
-            }
+        function extractPrimitives() {
+            let primitiveIndex = 0;
             
-            // If no container selected, show whole warehouse
-            if (!containerIdentifier || containerIdentifier === '') {
-                console.log('📦 No container selected - showing whole warehouse');
-                resetToFullView();
-                return;
-            }
+            model.traverse((child) => {
+                if (child.isMesh) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach((mat, idx) => {
+                            primitives.push({
+                                primitiveID: primitiveIndex,
+                                mesh: child,
+                                materialIndex: idx,
+                                materialName: mat.name || 'Unnamed',
+                                meshName: child.name || 'Unnamed',
+                                originalMaterial: mat.clone(),
+                                color: mat.color ? mat.color.getHex() : 0xcccccc
+                            });
+                            primitiveIndex++;
+                        });
+                    } else {
+                        primitives.push({
+                            primitiveID: primitiveIndex,
+                            mesh: child,
+                            materialIndex: -1,
+                            materialName: child.material.name || 'Unnamed',
+                            meshName: child.name || 'Unnamed',
+                            originalMaterial: child.material.clone(),
+                            color: child.material.color ? child.material.color.getHex() : 0xcccccc
+                        });
+                        primitiveIndex++;
+                    }
+                }
+            });
             
+            console.log(`✅ Found ${primitives.length} primitives`);
+        }
+
+        function autoSelect(containerName) {
             console.log('\n═══════════════════════════════');
-            console.log('🎯 Selecting container ID:', containerIdentifier);
+            console.log('🎯 Auto-selecting:', containerName);
             
-            // Parse container ID to number
-            const targetId = parseInt(containerIdentifier);
-            if (isNaN(targetId)) {
-                console.log('❌ Invalid container ID - must be numeric');
-                console.log('Received:', containerIdentifier);
-                resetToFullView();
+            const container = CSV_CONTAINERS.find(c => c.name === containerName);
+            if (!container) {
+                console.log('❌ Container not found in mapping');
+                resetAllPrimitives();
                 return;
             }
             
-            console.log(`✓ Parsed target ID: ${targetId}`);
-            
-            // Find objects matching the target ID
-            const matchedObjects = allObjects.filter(obj => {
-                if (obj.numericId === targetId) {
-                    console.log('✅ MATCH FOUND:', obj.name, '→ ID:', obj.numericId, '→ Type:', obj.type);
-                    return true;
-                }
-                return false;
-            });
-            
-            console.log(`Found ${matchedObjects.length} matching object(s) for ID ${targetId}`);
-            
-            // STEP 1: Hide ALL objects initially
-            allObjects.forEach(item => {
-                if (item.object.isMesh || item.object.isGroup || item.object.isObject3D) {
-                    item.object.visible = false;
-                }
-                
-                // Reset material for meshes
-                if (item.object.isMesh) {
-                    const originalMat = originalMaterials.get(item.object.uuid);
-                    if (originalMat) {
-                        item.object.material = originalMat.clone();
-                    }
-                }
-            });
-            
-            if (matchedObjects.length > 0) {
-                const color = 0xff0000; // Red highlight
-                
-                console.log('🎨 Highlighting and showing ONLY selected objects...');
-                
-                // STEP 2: Show ONLY matched objects
-                matchedObjects.forEach((item, index) => {
-                    // Make the matched object visible
-                    item.object.visible = true;
-                    
-                    // Make sure all parent objects are visible too
-                    let parent = item.object.parent;
-                    while (parent) {
-                        parent.visible = true;
-                        parent = parent.parent;
-                    }
-                    
-                    // Highlight the object in red
-                    highlightObject(item.object, color);
-                    console.log(`  ${index + 1}. Highlighted and showing: ${item.name}`);
-                });
-                
-                // STEP 3: Zoom camera VERY CLOSE to the selected object
-                console.log('📷 Focusing camera (close zoom)...');
-                focusCameraOnClose(matchedObjects[0].object);
-                console.log('✅ Camera focused on container (isolated view)');
-            } else {
-                console.log('❌ No container found with ID:', targetId);
-                resetToFullView();
+            const matchingPrim = primitives.find(p => p.materialName === container.materialName);
+            if (!matchingPrim) {
+                console.log('❌ No primitive with material:', container.materialName);
+                resetAllPrimitives();
+                return;
             }
             
-            console.log('═══════════════════════════════\n');
-        }
-
-        // Reset view to show entire warehouse
-        function resetToFullView() {
-            console.log('🔄 Resetting to full warehouse view');
+            console.log('✅ Found primitive:', matchingPrim.primitiveID);
             
-            // Show all objects and reset materials
-            allObjects.forEach(item => {
-                // Make all objects visible (not just meshes)
-                if (item.object.isMesh || item.object.isGroup || item.object.isObject3D) {
-                    item.object.visible = true;
-                }
-                
-                // Reset material for meshes
-                if (item.object.isMesh) {
-                    const originalMat = originalMaterials.get(item.object.uuid);
-                    if (originalMat) {
-                        item.object.material = originalMat.clone();
-                    }
-                }
+            // STEP 1: HIDE ALL primitives
+            primitives.forEach((prim) => {
+                prim.mesh.visible = false;
             });
             
-            fitCamera();
-        }
-
-        // Zoom camera very close to selected object
-        function focusCameraOnClose(object) {
-            const box = new THREE.Box3().setFromObject(object);
+            // STEP 2: SHOW ONLY the matched primitive
+            matchingPrim.mesh.visible = true;
+            
+            // Make sure parents are visible
+            let parent = matchingPrim.mesh.parent;
+            while (parent) {
+                parent.visible = true;
+                parent = parent.parent;
+            }
+            
+            // STEP 3: HIGHLIGHT with container's color
+            const highlightMat = new THREE.MeshStandardMaterial({
+                color: container.color,
+                emissive: container.color,
+                emissiveIntensity: 0.9,
+                roughness: 0.2,
+                metalness: 0.8
+            });
+            
+            if (matchingPrim.materialIndex >= 0) {
+                matchingPrim.mesh.material[matchingPrim.materialIndex] = highlightMat;
+            } else {
+                matchingPrim.mesh.material = highlightMat;
+            }
+            
+            console.log('🎨 Highlighted in color:', container.color.toString(16));
+            
+            // STEP 4: ZOOM VERY CLOSE
+            const box = new THREE.Box3().setFromObject(matchingPrim.mesh);
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z);
             
-            // 0.8 = VERY CLOSE zoom (smaller = closer)
+            // VERY CLOSE zoom - 0.8x (change to 0.5 for even closer)
             const dist = Math.max(maxDim * 0.8, 2);
             
             camera.position.set(
                 center.x + dist * 0.6,
-                center.y + dist * 0.7,  // Slightly from above
+                center.y + dist * 0.7,
                 center.z + dist * 0.6
             );
             camera.lookAt(center);
             controls.target.copy(center);
+            
+            console.log('📷 Camera zoomed VERY CLOSE');
+            console.log('═══════════════════════════════\n');
         }
 
-        // Apply red highlight material to object
-        function highlightObject(object, color) {
-            if (object.isMesh) {
-                const highlightMat = new THREE.MeshStandardMaterial({
-                    color: color,
-                    emissive: color,
-                    emissiveIntensity: 0.9,
-                    roughness: 0.2,
-                    metalness: 0.8
-                });
-                
-                if (Array.isArray(object.material)) {
-                    object.material = object.material.map(() => highlightMat.clone());
-                } else {
-                    object.material = highlightMat;
-                }
-            }
+        function resetAllPrimitives() {
+            console.log('🔄 Resetting to full view');
             
-            // Also highlight child meshes
-            object.traverse((child) => {
-                if (child.isMesh && child !== object) {
-                    const highlightMat = new THREE.MeshStandardMaterial({
-                        color: color,
-                        emissive: color,
-                        emissiveIntensity: 0.9,
-                        roughness: 0.2,
-                        metalness: 0.8
-                    });
-                    child.material = highlightMat;
+            // Show all primitives
+            primitives.forEach((prim) => {
+                prim.mesh.visible = true;
+                
+                // Reset to original material
+                if (prim.materialIndex >= 0) {
+                    prim.mesh.material[prim.materialIndex] = prim.originalMaterial.clone();
+                } else {
+                    prim.mesh.material = prim.originalMaterial.clone();
                 }
             });
+            
+            // Zoom out to full view
+            fitCamera();
         }
 
-        // Fit camera to show entire model
         function fitCamera() {
             if (!model) return;
             const box = new THREE.Box3().setFromObject(model);
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z);
-            const fov = camera.fov * (Math.PI / 180);
-            const dist = Math.abs(maxDim / Math.tan(fov / 2)) * 1.5;
-            
-            camera.position.set(
-                center.x + dist * 0.7,
-                center.y + dist * 0.5,
-                center.z + dist * 0.7
-            );
+            const dist = maxDim * 2;
+            camera.position.set(center.x + dist, center.y + dist * 0.7, center.z + dist);
             camera.lookAt(center);
             controls.target.copy(center);
         }
 
-        // Animation loop
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
             renderer.render(scene, camera);
         }
 
-        // Handle window resize
         function onResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // Start everything
         window.addEventListener('load', init);
     </script>
 </body>
