@@ -3,508 +3,236 @@
 <head>
 <meta charset="utf-8">
 <title>Warehouse 3D Viewer</title>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
 <style>
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-:root {
-  --bg:       #0b0c0e;
-  --surface:  #13151a;
-  --surface2: #1c1f27;
-  --border:   rgba(255,255,255,0.06);
-  --accent:   #ff6a00;
-  --text:     #e8e9eb;
-  --muted:    #5a6072;
-  --danger:   #ff5c5c;
-  --success:  #3effa0;
-}
-html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); }
-#canvas-wrap { position: fixed; inset: 0; }
-#canvas-wrap canvas { display: block; width: 100% !important; height: 100% !important; }
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; height:100%; overflow:hidden; background:#0b0c0e; }
 
-/* Loading */
+#canvas-wrap { position:fixed; inset:0; }
+#canvas-wrap canvas { width:100%!important; height:100%!important; display:block; }
+
 #loading {
-  position: fixed; inset: 0; background: var(--bg);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  z-index: 100; gap: 18px;
-  transition: opacity 0.5s ease, visibility 0.5s ease;
+  position:fixed; inset:0; background:#0b0c0e;
+  display:flex; align-items:center; justify-content:center;
+  color:white; font-family:'DM Mono',monospace;
 }
-#loading.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
-.load-logo { font-family:'Syne',sans-serif; font-size:12px; font-weight:700; letter-spacing:0.35em; text-transform:uppercase; color:var(--muted); }
-.load-bar-wrap { width:180px; height:2px; background:var(--surface2); border-radius:2px; overflow:hidden; }
-.load-bar { height:100%; width:0%; background:var(--accent); border-radius:2px; transition:width 0.25s ease; }
-.load-pct { font-family:'DM Mono',monospace; font-size:11px; color:var(--muted); }
-.load-status { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:0.05em; }
-
-/* Top bar */
-#topbar {
-  position:fixed; top:0; left:0; right:0; height:48px;
-  display:flex; align-items:center; justify-content:space-between; padding:0 16px;
-  background:linear-gradient(to bottom,rgba(11,12,14,0.9) 0%,transparent 100%);
-  z-index:10; pointer-events:none;
-}
-.topbar-brand { font-family:'Syne',sans-serif; font-size:11px; font-weight:700; letter-spacing:0.3em; color:var(--muted); text-transform:uppercase; }
-.topbar-mode { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); }
-.topbar-mode span { padding:2px 8px; border:1px solid var(--border); border-radius:4px; background:rgba(255,255,255,0.03); }
-
-/* Panel */
-#panel {
-  position:fixed; top:60px; right:16px; width:240px;
-  background:var(--surface); border:1px solid var(--border); border-radius:12px;
-  overflow:hidden; z-index:10;
-  transform:translateX(calc(100% + 20px));
-  transition:transform 0.45s cubic-bezier(0.16,1,0.3,1);
-}
-#panel.visible { transform:translateX(0); }
-.panel-header { padding:14px 16px 10px; border-bottom:1px solid var(--border); }
-.panel-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:0.2em; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
-.panel-id { font-family:'Syne',sans-serif; font-size:20px; font-weight:800; color:var(--text); line-height:1; word-break:break-all; }
-.panel-body { padding:12px 16px 16px; display:flex; flex-direction:column; gap:8px; }
-.panel-row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.panel-row-label { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); flex-shrink:0; }
-.panel-row-val { font-family:'DM Mono',monospace; font-size:10px; color:var(--text); text-align:right; word-break:break-all; }
-.divider { height:1px; background:var(--border); margin:2px 0; }
-.status-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:4px; font-family:'DM Mono',monospace; font-size:9px; letter-spacing:0.1em; text-transform:uppercase; font-weight:500; }
-.status-badge::before { content:''; display:block; width:5px; height:5px; border-radius:50%; background:currentColor; }
-.s-found   { background:rgba(62,255,160,0.1); color:var(--success); }
-.s-missing { background:rgba(255,92,92,0.1);  color:var(--danger); }
-.s-free    { background:rgba(255,106,0,0.12); color:#ff6a00; }
-
-/* Hint bar — shown when no container selected */
-#hint {
-  position:fixed; bottom:60px; left:50%;
-  transform:translateX(-50%);
-  background:var(--surface); border:1px solid var(--border); border-radius:8px;
-  padding:8px 16px; font-family:'DM Mono',monospace; font-size:10px;
-  color:var(--muted); z-index:10; white-space:nowrap;
-  transition:opacity 0.4s ease;
-}
-#hint.hidden { opacity:0; pointer-events:none; }
-
-/* Toast */
-#toast {
-  position:fixed; bottom:20px; left:50%;
-  transform:translateX(-50%) translateY(60px);
-  background:var(--surface2); border:1px solid var(--border);
-  border-left:3px solid var(--danger); border-radius:8px;
-  padding:10px 16px; font-family:'DM Mono',monospace; font-size:11px; color:var(--text);
-  z-index:50; transition:transform 0.4s cubic-bezier(0.16,1,0.3,1); white-space:nowrap;
-}
-#toast.show { transform:translateX(-50%) translateY(0); }
-
-/* Reset */
 #btn-reset {
-  position:fixed; bottom:20px; right:16px;
-  background:var(--surface); border:1px solid var(--border); border-radius:8px;
-  padding:9px 14px; font-family:'DM Mono',monospace; font-size:10px;
-  letter-spacing:0.08em; color:var(--muted); cursor:pointer; z-index:10; display:none;
-  transition:color 0.2s,border-color 0.2s,background 0.2s;
+  position:fixed; bottom:20px; right:20px;
+  padding:10px 15px; background:#13151a;
+  color:white; border:1px solid rgba(255,255,255,0.1);
+  border-radius:6px; cursor:pointer; display:none;
 }
-#btn-reset:hover { color:var(--text); border-color:rgba(255,255,255,0.15); background:var(--surface2); }
 #btn-reset.visible { display:block; }
 </style>
 </head>
+
 <body>
 
 <div id="canvas-wrap"></div>
-
-<div id="loading">
-  <div class="load-logo">Birmarket Warehouse</div>
-  <div class="load-bar-wrap"><div class="load-bar" id="load-bar"></div></div>
-  <div class="load-pct" id="load-pct">0%</div>
-  <div class="load-status" id="load-status">Connecting…</div>
-</div>
-
-<div id="topbar">
-  <div class="topbar-brand">WH Viewer</div>
-  <div class="topbar-mode"><span id="mode-label">Loading…</span></div>
-</div>
-
-<div id="panel">
-  <div class="panel-header">
-    <div class="panel-label">Container</div>
-    <div class="panel-id" id="panel-id">—</div>
-  </div>
-  <div class="panel-body">
-    <div class="panel-row">
-      <span class="panel-row-label">Status</span>
-      <span id="panel-status" class="status-badge s-found">Located</span>
-    </div>
-    <div class="divider"></div>
-    <div class="panel-row">
-      <span class="panel-row-label">Node</span>
-      <span class="panel-row-val" id="panel-node">—</span>
-    </div>
-    <div class="panel-row">
-      <span class="panel-row-label">Match</span>
-      <span class="panel-row-val" id="panel-match">—</span>
-    </div>
-  </div>
-</div>
-
-<div id="hint">🖱 Scroll to zoom · Drag to orbit · Right-drag to pan</div>
-<div id="toast"></div>
+<div id="loading">Loading warehouse...</div>
 <button id="btn-reset" onclick="resetView()">↩ Show All</button>
 
 <script>
-// ══════════════════════════════════════════════════════════════
-//  CONFIG
-// ══════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════
 const CONFIG = {
-  glbUrl:            'https://sharifsharifzada.github.io/warehouse-3d-viewer/warehouse-3d-with-textures1.glb',
-  secret:            'Birmarket-Secure-2024-Y10G2P7M4',
-  highlightColor:    0xff6a00,   // vivid orange — clearly visible on any texture
-  highlightEmissive: 2.5,        // very strong glow
-  cameraLerp:        0.055,
-  cameraZoom:        3.5,
-  cameraMinDist:     0.8,
-  cameraFixedDist:   8,
+  glbUrl: "https://sharifsharifzada.github.io/warehouse-3d-viewer/warehouse-3d-with-textures1.glb",
+  highlightColor: 0xff6a00,
+  highlightEmissive: 2.5,
+  cameraLerp: 0.08,
+  cameraZoom: 2.0,      // closer zoom
+  cameraMinDist: 0.3,
+  cameraMaxDist: 50
 };
 
-// ══════════════════════════════════════════════════════════════
-//  URL PARAMS
-// ══════════════════════════════════════════════════════════════
-const params       = new URLSearchParams(window.location.search);
-const urlContainer = (params.get('container') || '').trim();
-const urlNodeIndex = params.get('nodeindex') !== null ? parseInt(params.get('nodeindex')) : -1;
+// URL PARAMS
+const params = new URLSearchParams(window.location.search);
+const urlNodeIndex = params.get("nodeindex") !== null ? parseInt(params.get("nodeindex")) : -1;
 
-// ══════════════════════════════════════════════════════════════
-//  STATE
-// ══════════════════════════════════════════════════════════════
+// STATE
 let scene, camera, renderer, controls, model;
-let allMeshes    = [];
-let nodeMap      = new Map();      // exact node name  → record
-let nodeIndexMap = new Map();      // traverse index   → record
-let highlighted  = null;           // { record, hlMats }
+let nodeIndexMap = new Map();
+let highlighted = null;
 let camAnimTarget = null;
-let isAnimating   = false;
+let isAnimating = false;
 
-// ══════════════════════════════════════════════════════════════
-//  INIT
-// ══════════════════════════════════════════════════════════════
+// INIT
 function init() {
-  const wrap = document.getElementById('canvas-wrap');
+  const wrap = document.getElementById("canvas-wrap");
 
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0b0c0e);
-  scene.fog = new THREE.FogExp2(0x0b0c0e, 0.010);
 
   camera = new THREE.PerspectiveCamera(45, wrap.clientWidth / wrap.clientHeight, 0.1, 2000);
   camera.position.set(20, 14, 20);
 
-  renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer = new THREE.WebGLRenderer({ antialias:true });
   renderer.setSize(wrap.clientWidth, wrap.clientHeight);
-  renderer.outputEncoding     = THREE.sRGBEncoding;
-  renderer.toneMapping        = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
-  renderer.shadowMap.enabled  = false;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
   wrap.appendChild(renderer.domElement);
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.75));
-  const sun = new THREE.DirectionalLight(0xfff4e0, 1.0);
-  sun.position.set(30, 50, 20);
-  scene.add(sun);
-  const fill = new THREE.DirectionalLight(0xd0e8ff, 0.3);
-  fill.position.set(-20, 10, -15);
-  scene.add(fill);
+  scene.add(new THREE.AmbientLight(0xffffff,0.8));
+  const light = new THREE.DirectionalLight(0xffffff,1);
+  light.position.set(30,50,20);
+  scene.add(light);
 
-  const grid = new THREE.GridHelper(80, 80, 0x151820, 0x111318);
-  grid.position.y = -0.02;
-  scene.add(grid);
-
-  // Controls — always enabled, user can orbit/zoom/pan freely
   controls = new THREE.OrbitControls(camera, renderer.domElement);
-  controls.enableDamping  = true;
-  controls.dampingFactor  = 0.07;
-  controls.minDistance    = 0.5;
-  controls.maxDistance    = 500;
-  controls.maxPolarAngle  = Math.PI * 0.5;
-  controls.enableZoom     = true;
-  controls.enableRotate   = true;
-  controls.enablePan      = true;
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.07;
+  controls.minDistance = 0.2;
+  controls.maxDistance = 500;
 
-  window.addEventListener('resize', onResize);
+  window.addEventListener("resize", onResize);
+
   loadModel();
   animate();
 }
 
-// ══════════════════════════════════════════════════════════════
-//  LOAD
-// ══════════════════════════════════════════════════════════════
+// LOAD MODEL
 function loadModel() {
-  setStatus('Fetching model…');
   const loader = new THREE.GLTFLoader();
-  loader.load(
-    CONFIG.glbUrl,
-    onLoaded,
-    (xhr) => {
-      if (xhr.lengthComputable) {
-        const pct = Math.round((xhr.loaded / xhr.total) * 100);
-        setProgress(pct);
-        setStatus(pct < 100 ? 'Downloading… ' + pct + '%' : 'Building scene…');
-      }
-    },
-    (err) => { console.error(err); showToast('Model load failed'); hideLoader(); }
-  );
-}
+  loader.load(CONFIG.glbUrl, function(gltf){
 
-function onLoaded(gltf) {
-  setStatus('Preparing nodes…');
-  model = gltf.scene;
+    model = gltf.scene;
 
-  let ti = 0;
-  model.traverse((obj) => {
-    if (!obj.isMesh) return;
-    obj.frustumCulled = true;
+    let index = 0;
+    model.traverse(obj=>{
+      if(!obj.isMesh) return;
+      nodeIndexMap.set(index,{
+        node:obj,
+        origMat: obj.material
+      });
+      index++;
+    });
 
-    // Keep reference to original material — NEVER modify origMat directly
-    const origMat = Array.isArray(obj.material) ? obj.material : obj.material;
-    const record  = { node: obj, nodeName: obj.name || '', origMat, nodeIndex: ti };
-    allMeshes.push(record);
+    scene.add(model);
+    fitCamera();
+    document.getElementById("loading").style.display="none";
 
-    const key = obj.name.trim();
-    if (key && !nodeMap.has(key)) nodeMap.set(key, record);
-    nodeIndexMap.set(ti, record);
-    ti++;
-  });
-
-  // Centre model at ground
-  const box    = new THREE.Box3().setFromObject(model);
-  const center = box.getCenter(new THREE.Vector3());
-  model.position.set(-center.x, -box.min.y, -center.z);
-  scene.add(model);
-
-  console.log('Meshes: ' + allMeshes.length + ' | Named: ' + nodeMap.size);
-
-  fitCamera();
-  setProgress(100);
-
-  setTimeout(() => {
-    hideLoader();
-    if (urlNodeIndex >= 0) {
-      // A specific container was selected in PBI slicer
+    if(urlNodeIndex>=0){
       selectByIndex(urlNodeIndex);
-    } else if (urlContainer) {
-      selectByName(urlContainer);
-    } else {
-      // No selection — free roam mode
-      setFreeRoamMode();
     }
-  }, 250);
-}
 
-// ══════════════════════════════════════════════════════════════
-//  FREE ROAM MODE — no selection, full model, orbit freely
-// ══════════════════════════════════════════════════════════════
-function setFreeRoamMode() {
-  clearHighlight();
-  setModeLabel('Free View — No Selection');
-  document.getElementById('panel').classList.remove('visible');
-  document.getElementById('btn-reset').classList.remove('visible');
-  document.getElementById('hint').classList.remove('hidden');
-
-  // Fit camera to entire model so user sees everything
-  fitCamera();
-}
-
-// ══════════════════════════════════════════════════════════════
-//  SELECTION — by Node Index (primary, from PBI slicer)
-// ══════════════════════════════════════════════════════════════
-function selectByIndex(index) {
-  const record = nodeIndexMap.get(index);
-  clearHighlight();
-  document.getElementById('hint').classList.add('hidden');
-
-  if (!record) {
-    showToast('Node index ' + index + ' not found in model');
-    setModeLabel('Not Found');
-    updatePanel({ id: String(index), found: false });
-    return;
-  }
-
-  applyHighlight(record);
-
-  // Zoom camera close to this container — full warehouse stays visible
-  animateCameraTo(record.node);
-
-  setModeLabel('#' + index + ' — ' + record.nodeName);
-  updatePanel({ id: '#' + index + ' / ' + record.nodeName, record, found: true, matchType: 'Node Index' });
-  document.getElementById('btn-reset').classList.add('visible');
-}
-
-// ── by Container ID string (fallback) ─────────────────────────
-function selectByName(id) {
-  const record = nodeMap.get(id.toString().trim());
-  clearHighlight();
-  document.getElementById('hint').classList.add('hidden');
-
-  if (!record) {
-    showToast('Container "' + id + '" not found');
-    setModeLabel('Not Found');
-    updatePanel({ id, found: false });
-    return;
-  }
-
-  applyHighlight(record);
-  animateCameraTo(record.node);
-  setModeLabel('Container: ' + record.nodeName);
-  updatePanel({ id, record, found: true, matchType: 'Exact' });
-  document.getElementById('btn-reset').classList.add('visible');
-}
-
-// ══════════════════════════════════════════════════════════════
-//  HIGHLIGHT — orange glow on selected, all others unchanged
-// ══════════════════════════════════════════════════════════════
-function applyHighlight(record) {
-  const origMats = Array.isArray(record.origMat) ? record.origMat : [record.origMat];
-  const hlMats   = origMats.map(function(m) {
-    var h = m.clone();
-    h.color             = new THREE.Color(CONFIG.highlightColor);
-    h.emissive          = new THREE.Color(CONFIG.highlightColor);
-    h.emissiveIntensity = CONFIG.highlightEmissive;
-    h.map               = null;   // clear texture so orange is unmissable
-    h.needsUpdate       = true;
-    return h;
   });
-
-  record.node.material    = hlMats.length === 1 ? hlMats[0] : hlMats;
-  record.node.renderOrder = 1;
-  highlighted = { record, hlMats };
 }
 
-function clearHighlight() {
-  if (!highlighted) return;
-  highlighted.record.node.material    = highlighted.record.origMat;
-  highlighted.record.node.renderOrder = 0;
-  highlighted.hlMats.forEach(function(m) { m.dispose(); });
-  highlighted = null;
+// SELECT BY INDEX
+function selectByIndex(index){
+  const record = nodeIndexMap.get(index);
+  if(!record) return;
+
+  clearHighlight();
+  applyHighlight(record);
+  animateCameraTo(record.node);
+  document.getElementById("btn-reset").classList.add("visible");
 }
 
-// ══════════════════════════════════════════════════════════════
-//  RESET — goes back to free roam / full model view
-// ══════════════════════════════════════════════════════════════
-window.resetView = function() {
-  setFreeRoamMode();
-};
+// HIGHLIGHT
+function applyHighlight(record){
+  const orig = Array.isArray(record.origMat)?record.origMat:[record.origMat];
+  const hl = orig.map(m=>{
+    const c = m.clone();
+    c.color = new THREE.Color(CONFIG.highlightColor);
+    c.emissive = new THREE.Color(CONFIG.highlightColor);
+    c.emissiveIntensity = CONFIG.highlightEmissive;
+    c.map=null;
+    return c;
+  });
+  record.node.material = hl.length===1?hl[0]:hl;
+  highlighted = {record, hl};
+}
 
-// ══════════════════════════════════════════════════════════════
-//  CAMERA
-// ══════════════════════════════════════════════════════════════
-function animateCameraTo(obj) {
-  const box    = new THREE.Box3().setFromObject(obj);
+function clearHighlight(){
+  if(!highlighted) return;
+  highlighted.record.node.material = highlighted.record.origMat;
+  highlighted.hl.forEach(m=>m.dispose());
+  highlighted=null;
+}
+
+// CAMERA FOCUS
+function animateCameraTo(obj){
+  const box = new THREE.Box3().setFromObject(obj);
   const center = box.getCenter(new THREE.Vector3());
-  const size   = box.getSize(new THREE.Vector3());
-  const maxDim = Math.max(size.x, size.y, size.z, 0.3);
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x,size.y,size.z,0.2);
 
   const dist = Math.min(
-    Math.max(maxDim * CONFIG.cameraZoom, CONFIG.cameraMinDist),
-    CONFIG.cameraFixedDist
+    Math.max(maxDim*CONFIG.cameraZoom, CONFIG.cameraMinDist),
+    CONFIG.cameraMaxDist
   );
 
   const newPos = new THREE.Vector3(
-    center.x + dist * 0.7,
-    center.y + dist * 0.6,
-    center.z + dist * 0.7
+    center.x + dist*0.7,
+    center.y + dist*0.6,
+    center.z + dist*0.7
   );
 
-  camAnimTarget = { position: newPos, lookAt: center.clone() };
-  isAnimating   = true;
+  camAnimTarget = {position:newPos, lookAt:center.clone()};
+  isAnimating=true;
 }
 
-function fitCamera() {
-  if (!model) return;
-  const box    = new THREE.Box3().setFromObject(model);
+// FIT FULL MODEL
+function fitCamera(){
+  if(!model) return;
+  const box = new THREE.Box3().setFromObject(model);
   const center = box.getCenter(new THREE.Vector3());
-  const size   = box.getSize(new THREE.Vector3());
-  const dist   = Math.max(size.x, size.y, size.z) * 1.5;
+  const size = box.getSize(new THREE.Vector3());
+  const dist = Math.max(size.x,size.y,size.z)*1.5;
 
-  camAnimTarget = {
-    position: new THREE.Vector3(
-      center.x + dist * 0.7,
-      center.y + dist * 0.5,
-      center.z + dist * 0.7
+  camAnimTarget={
+    position:new THREE.Vector3(
+      center.x+dist*0.7,
+      center.y+dist*0.5,
+      center.z+dist*0.7
     ),
-    lookAt: center.clone(),
+    lookAt:center.clone()
   };
-  isAnimating = true;
+  isAnimating=true;
 }
 
-// ══════════════════════════════════════════════════════════════
-//  RENDER LOOP
-// ══════════════════════════════════════════════════════════════
-function animate() {
+// RESET
+window.resetView=function(){
+  clearHighlight();
+  fitCamera();
+  document.getElementById("btn-reset").classList.remove("visible");
+}
+
+// ANIMATE LOOP
+function animate(){
   requestAnimationFrame(animate);
 
-  if (isAnimating && camAnimTarget) {
+  if(isAnimating && camAnimTarget){
     camera.position.lerp(camAnimTarget.position, CONFIG.cameraLerp);
-    controls.target.lerp(camAnimTarget.lookAt,   CONFIG.cameraLerp);
+    controls.target.lerp(camAnimTarget.lookAt, CONFIG.cameraLerp);
 
-    if (
-      camera.position.distanceTo(camAnimTarget.position) < 0.02 &&
-      controls.target.distanceTo(camAnimTarget.lookAt)   < 0.02
-    ) {
-      camera.position.copy(camAnimTarget.position);
-      controls.target.copy(camAnimTarget.lookAt);
-      isAnimating = false;
+    if(camera.position.distanceTo(camAnimTarget.position)<0.02){
+      isAnimating=false;
     }
   }
 
   controls.update();
-  renderer.render(scene, camera);
+  renderer.render(scene,camera);
 }
 
-// ══════════════════════════════════════════════════════════════
-//  UI HELPERS
-// ══════════════════════════════════════════════════════════════
-function setProgress(pct) {
-  document.getElementById('load-bar').style.width = pct + '%';
-  document.getElementById('load-pct').textContent  = pct + '%';
-}
-function setStatus(txt)    { document.getElementById('load-status').textContent = txt; }
-function hideLoader()      { document.getElementById('loading').classList.add('hidden'); }
-function setModeLabel(txt) { document.getElementById('mode-label').textContent  = txt; }
-
-function updatePanel(info) {
-  const panel = document.getElementById('panel');
-  if (!info) { panel.classList.remove('visible'); return; }
-  panel.classList.add('visible');
-  document.getElementById('panel-id').textContent = info.id || '—';
-
-  const st = document.getElementById('panel-status');
-  if (!info.found) {
-    st.className   = 'status-badge s-missing';
-    st.textContent = 'Not Found';
-    document.getElementById('panel-node').textContent  = '—';
-    document.getElementById('panel-match').textContent = '—';
-    return;
-  }
-  st.className   = 'status-badge s-found';
-  st.textContent = 'Located';
-  document.getElementById('panel-node').textContent  = info.record.nodeName;
-  document.getElementById('panel-match').textContent = info.matchType;
-}
-
-var _toastTimer;
-function showToast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(function() { el.classList.remove('show'); }, 4000);
-}
-
-function onResize() {
-  const wrap = document.getElementById('canvas-wrap');
-  camera.aspect = wrap.clientWidth / wrap.clientHeight;
+// RESIZE
+function onResize(){
+  const wrap=document.getElementById("canvas-wrap");
+  camera.aspect=wrap.clientWidth/wrap.clientHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+  renderer.setSize(wrap.clientWidth,wrap.clientHeight);
 }
 
-window.addEventListener('load', init);
+window.addEventListener("load",init);
+
 </script>
 </body>
 </html>
