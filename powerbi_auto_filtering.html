@@ -2,11 +2,27 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Warehouse 3D Viewer - Fixed Close Zoom</title>
+    <title>Warehouse 3D Viewer</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: #f5f5f5; overflow: hidden; }
         #viewer { width: 100vw; height: 100vh; }
+
+        #label {
+            position: absolute;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.65);
+            color: #fff;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            display: none;
+            pointer-events: none;
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -14,242 +30,253 @@
 </head>
 <body>
     <div id="viewer"></div>
+    <div id="label"></div>
 
     <script>
-        // Container mapping - UPDATE WITH YOUR ACTUAL CONTAINER NAMES
+        // ─── Container Mapping ───────────────────────────────────────────────
+        // name        → must match the ?container= value sent from Power BI
+        // materialName → must match the material name inside your GLB file
+        // color        → highlight color for that container
         const CSV_CONTAINERS = [
-            { name: 'Container_Red', materialName: 'test1', color: 0xff0000 },
-            { name: 'Container_Green', materialName: 'test2', color: 0x00ff00 },
-            { name: 'Container_Blue', materialName: 'test3', color: 0x0000ff },
-            { name: 'Container_Purple', materialName: 'test', color: 0x800080 },
-            { name: 'Container_Cyan', materialName: 'test', color: 0x00ffff }
+            { name: 'Container_Red',    materialName: 'test1', color: 0xff3333 },
+            { name: 'Container_Green',  materialName: 'test2', color: 0x33dd33 },
+            { name: 'Container_Blue',   materialName: 'test3', color: 0x3399ff },
+            { name: 'Container_Purple', materialName: 'test',  color: 0xaa44ff },
+            { name: 'Container_Cyan',   materialName: 'test',  color: 0x00eeff }
         ];
+        // ────────────────────────────────────────────────────────────────────
 
         function getURLParameter(name) {
-            const urlParams = new URLSearchParams(window.location.search);
-            return urlParams.get(name);
+            return new URLSearchParams(window.location.search).get(name);
         }
 
         const urlSelectedContainer = getURLParameter('container');
-        console.log('🎯 Selected container:', urlSelectedContainer);
+        console.log('🎯 Selected container from URL:', urlSelectedContainer);
 
         let scene, camera, renderer, controls;
         let model = null;
         let primitives = [];
-        let glbLoaded = false;
 
         function init() {
             const container = document.getElementById('viewer');
-            
+
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xf5f5f5);
-            
+            scene.background = new THREE.Color(0xf0f0f0);
+
             camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(8, 6, 8);
-            
+
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
             container.appendChild(renderer.domElement);
-            
-            scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-            const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
-            dirLight1.position.set(10, 10, 5);
-            scene.add(dirLight1);
-            
+
+            // Lights
+            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+            const dir1 = new THREE.DirectionalLight(0xffffff, 0.9);
+            dir1.position.set(10, 15, 5);
+            dir1.castShadow = true;
+            scene.add(dir1);
+            const dir2 = new THREE.DirectionalLight(0xffffff, 0.3);
+            dir2.position.set(-10, 5, -5);
+            scene.add(dir2);
+
+            // Ground
             const ground = new THREE.Mesh(
-                new THREE.PlaneGeometry(20, 20),
+                new THREE.PlaneGeometry(30, 30),
                 new THREE.MeshStandardMaterial({ color: 0xdddddd })
             );
             ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
             scene.add(ground);
-            
-            scene.add(new THREE.GridHelper(20, 20, 0xcccccc, 0xe0e0e0));
-            
+            scene.add(new THREE.GridHelper(30, 30, 0xcccccc, 0xe0e0e0));
+
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
-            
+            controls.dampingFactor = 0.08;
+            controls.minDistance = 1;
+            controls.maxDistance = 200;
+
             loadGLB();
             animate();
-            
             window.addEventListener('resize', onResize);
         }
 
         function loadGLB() {
             const loader = new THREE.GLTFLoader();
             const glbUrl = 'https://sharifsharifzada.github.io/warehouse-3d-viewer/WareHouseIDTest_05.glb';
-            
-            console.log('📦 Loading:', glbUrl);
-            
+            console.log('📦 Loading GLB:', glbUrl);
+
             loader.load(
                 glbUrl,
                 (gltf) => {
-                    console.log('✅ GLB Loaded');
-                    
+                    console.log('✅ GLB loaded successfully');
                     model = gltf.scene;
                     scene.add(model);
-                    
+
+                    // Centre the model on the ground
                     const box = new THREE.Box3().setFromObject(model);
                     const center = box.getCenter(new THREE.Vector3());
-                    const size = box.getSize(new THREE.Vector3());
-                    model.position.set(-center.x, -center.y + size.y/2, -center.z);
-                    
+                    const size   = box.getSize(new THREE.Vector3());
+                    model.position.set(-center.x, -center.y + size.y / 2, -center.z);
+
                     extractPrimitives();
-                    fitCamera();
-                    
-                    glbLoaded = true;
-                    
-                    // Auto-select if URL parameter exists
+                    fitCamera(); // always start with full-warehouse view
+
                     if (urlSelectedContainer) {
-                        setTimeout(() => autoSelect(urlSelectedContainer), 300);
-                    } else {
-                        console.log('📦 No selection - showing full model');
+                        setTimeout(() => highlightContainer(urlSelectedContainer), 300);
                     }
                 },
-                null,
+                (xhr) => {
+                    if (xhr.total) console.log(`Loading: ${Math.round(xhr.loaded / xhr.total * 100)}%`);
+                },
                 (error) => {
-                    console.error('❌ Error loading GLB:', error);
+                    console.error('❌ GLB load error:', error);
                 }
             );
         }
 
         function extractPrimitives() {
-            let primitiveIndex = 0;
-            
+            let idx = 0;
             model.traverse((child) => {
-                if (child.isMesh) {
-                    if (Array.isArray(child.material)) {
-                        child.material.forEach((mat, idx) => {
-                            primitives.push({
-                                primitiveID: primitiveIndex,
-                                mesh: child,
-                                materialIndex: idx,
-                                materialName: mat.name || 'Unnamed',
-                                meshName: child.name || 'Unnamed',
-                                originalMaterial: mat.clone(),
-                                color: mat.color ? mat.color.getHex() : 0xcccccc
-                            });
-                            primitiveIndex++;
-                        });
-                    } else {
-                        primitives.push({
-                            primitiveID: primitiveIndex,
-                            mesh: child,
-                            materialIndex: -1,
-                            materialName: child.material.name || 'Unnamed',
-                            meshName: child.name || 'Unnamed',
-                            originalMaterial: child.material.clone(),
-                            color: child.material.color ? child.material.color.getHex() : 0xcccccc
-                        });
-                        primitiveIndex++;
-                    }
-                }
+                if (!child.isMesh) return;
+                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                mats.forEach((mat, mi) => {
+                    primitives.push({
+                        primitiveID:      idx++,
+                        mesh:             child,
+                        materialIndex:    Array.isArray(child.material) ? mi : -1,
+                        materialName:     mat.name || 'Unnamed',
+                        meshName:         child.name || 'Unnamed',
+                        originalMaterial: mat.clone()
+                    });
+                });
             });
-            
-            console.log(`✅ Found ${primitives.length} primitives`);
+            console.log(`✅ Extracted ${primitives.length} primitives`);
+            primitives.forEach(p =>
+                console.log(`  [${p.primitiveID}] mesh="${p.meshName}" material="${p.materialName}"`)
+            );
         }
 
-        function autoSelect(containerName) {
+        // ─── HIGHLIGHT: keeps whole model visible, dims others, glows selected ──
+        function highlightContainer(containerName) {
             console.log('\n═══════════════════════════════');
-            console.log('🎯 Auto-selecting:', containerName);
-            
-            const container = CSV_CONTAINERS.find(c => c.name === containerName);
-            if (!container) {
-                console.log('❌ Container not found in mapping');
+            console.log('🎯 Highlighting:', containerName);
+
+            const containerCfg = CSV_CONTAINERS.find(c => c.name === containerName);
+            if (!containerCfg) {
+                console.warn('❌ Container not found in CSV_CONTAINERS mapping:', containerName);
                 resetAllPrimitives();
                 return;
             }
-            
-            const matchingPrim = primitives.find(p => p.materialName === container.materialName);
+
+            const matchingPrim = primitives.find(p => p.materialName === containerCfg.materialName);
             if (!matchingPrim) {
-                console.log('❌ No primitive with material:', container.materialName);
+                console.warn('❌ No GLB primitive with materialName:', containerCfg.materialName);
                 resetAllPrimitives();
                 return;
             }
-            
-            console.log('✅ Found primitive:', matchingPrim.primitiveID);
-            
-            // STEP 1: HIDE ALL primitives
-            primitives.forEach((prim) => {
-                prim.mesh.visible = false;
+
+            console.log(`✅ Match → primitive #${matchingPrim.primitiveID}, mesh="${matchingPrim.meshName}"`);
+
+            // 1. Make sure every mesh is visible (full warehouse)
+            primitives.forEach(p => { p.mesh.visible = true; });
+
+            // 2. Dim non-selected primitives (greyed out, semi-transparent)
+            const dimMat = new THREE.MeshStandardMaterial({
+                color:       0xaaaaaa,
+                transparent: true,
+                opacity:     0.25,
+                roughness:   1.0,
+                metalness:   0.0
             });
-            
-            // STEP 2: SHOW ONLY the matched primitive
-            matchingPrim.mesh.visible = true;
-            
-            // Make sure parents are visible
-            let parent = matchingPrim.mesh.parent;
-            while (parent) {
-                parent.visible = true;
-                parent = parent.parent;
-            }
-            
-            // STEP 3: HIGHLIGHT with container's color
+
+            primitives.forEach(p => {
+                if (p === matchingPrim) return; // skip selected
+                if (p.materialIndex >= 0) {
+                    p.mesh.material[p.materialIndex] = dimMat.clone();
+                } else {
+                    p.mesh.material = dimMat.clone();
+                }
+            });
+
+            // 3. Apply glowing highlight to selected container
             const highlightMat = new THREE.MeshStandardMaterial({
-                color: container.color,
-                emissive: container.color,
-                emissiveIntensity: 0.9,
-                roughness: 0.2,
-                metalness: 0.8
+                color:            containerCfg.color,
+                emissive:         containerCfg.color,
+                emissiveIntensity: 0.7,
+                roughness:        0.2,
+                metalness:        0.5
             });
-            
+
             if (matchingPrim.materialIndex >= 0) {
                 matchingPrim.mesh.material[matchingPrim.materialIndex] = highlightMat;
             } else {
                 matchingPrim.mesh.material = highlightMat;
             }
-            
-            console.log('🎨 Highlighted in color:', container.color.toString(16));
-            
-            // STEP 4: ZOOM VERY CLOSE
-            const box = new THREE.Box3().setFromObject(matchingPrim.mesh);
-            const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
-            const maxDim = Math.max(size.x, size.y, size.z);
-            
-            // VERY CLOSE zoom - 0.8x (change to 0.5 for even closer)
-            const dist = Math.max(maxDim * 0.8, 2);
-            
+
+            // 4. Show label
+            const labelEl = document.getElementById('label');
+            labelEl.textContent = '📦 ' + containerName;
+            labelEl.style.display = 'block';
+            labelEl.style.borderLeft = '4px solid #' + containerCfg.color.toString(16).padStart(6, '0');
+
+            // 5. Camera: zoom in on selected container but keep warehouse context
+            //    Pull back enough to see the whole warehouse, angled toward the target
+            const selBox    = new THREE.Box3().setFromObject(matchingPrim.mesh);
+            const selCenter = selBox.getCenter(new THREE.Vector3());
+            const selSize   = selBox.getSize(new THREE.Vector3());
+            const selMaxDim = Math.max(selSize.x, selSize.y, selSize.z);
+
+            // Use full-model box for context distance
+            const fullBox    = new THREE.Box3().setFromObject(model);
+            const fullSize   = fullBox.getSize(new THREE.Vector3());
+            const fullMaxDim = Math.max(fullSize.x, fullSize.y, fullSize.z);
+
+            // Camera sits at a "medium" distance: close enough to see the highlight,
+            // far enough to show the whole warehouse around it
+            const dist = Math.max(selMaxDim * 3, fullMaxDim * 0.8);
+
             camera.position.set(
-                center.x + dist * 0.6,
-                center.y + dist * 0.7,
-                center.z + dist * 0.6
+                selCenter.x + dist * 0.55,
+                selCenter.y + dist * 0.60,
+                selCenter.z + dist * 0.55
             );
-            camera.lookAt(center);
-            controls.target.copy(center);
-            
-            console.log('📷 Camera zoomed VERY CLOSE');
+            camera.lookAt(selCenter);
+            controls.target.copy(selCenter);
+            controls.update();
+
+            console.log('🎨 Color:', '#' + containerCfg.color.toString(16).padStart(6,'0'));
+            console.log('📷 Camera positioned with full-warehouse context');
             console.log('═══════════════════════════════\n');
         }
 
         function resetAllPrimitives() {
-            console.log('🔄 Resetting to full view');
-            
-            // Show all primitives
-            primitives.forEach((prim) => {
-                prim.mesh.visible = true;
-                
-                // Reset to original material
-                if (prim.materialIndex >= 0) {
-                    prim.mesh.material[prim.materialIndex] = prim.originalMaterial.clone();
+            console.log('🔄 Resetting all to original materials');
+            document.getElementById('label').style.display = 'none';
+
+            primitives.forEach(p => {
+                p.mesh.visible = true;
+                if (p.materialIndex >= 0) {
+                    p.mesh.material[p.materialIndex] = p.originalMaterial.clone();
                 } else {
-                    prim.mesh.material = prim.originalMaterial.clone();
+                    p.mesh.material = p.originalMaterial.clone();
                 }
             });
-            
-            // Zoom out to full view
+
             fitCamera();
         }
 
         function fitCamera() {
             if (!model) return;
-            const box = new THREE.Box3().setFromObject(model);
+            const box    = new THREE.Box3().setFromObject(model);
             const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
-            const maxDim = Math.max(size.x, size.y, size.z);
-            const dist = maxDim * 2;
-            camera.position.set(center.x + dist, center.y + dist * 0.7, center.z + dist);
+            const size   = box.getSize(new THREE.Vector3());
+            const dist   = Math.max(size.x, size.y, size.z) * 2.2;
+            camera.position.set(center.x + dist * 0.7, center.y + dist * 0.6, center.z + dist * 0.7);
             camera.lookAt(center);
             controls.target.copy(center);
+            controls.update();
         }
 
         function animate() {
