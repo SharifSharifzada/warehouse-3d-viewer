@@ -122,46 +122,58 @@ function selectByIndex(index){
   animateCameraTo(record.node);
 }
 
-// ================= FULL YELLOW HIGHLIGHT =================
+// ================= FULL YELLOW HIGHLIGHT (entire container) =================
 function applyHighlight(record){
 
-  const mesh = record.node;
-
   const yellowMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffff00,
-      emissive: 0xffff00,
+      color: 0xffff00,          // FULL YELLOW
+      emissive: 0xffff00,       // Yellow glow
       emissiveIntensity: 3.0,
       roughness: 0.4,
       metalness: 0.1
   });
 
-  if (Array.isArray(mesh.material)) {
-      const newMats = mesh.material.map(() => yellowMaterial.clone());
-      mesh.material = newMats;
-  } else {
-      mesh.material = yellowMaterial;
-  }
+  const meshes = [];
 
-  mesh.renderOrder = 1;
-  mesh.scale.set(1.15,1.15,1.15);
+  // Traverse the whole container hierarchy
+  record.node.traverse((obj)=>{
+      if(obj.isMesh){
+          // Override all materials
+          if(Array.isArray(obj.material)){
+              const newMats = obj.material.map(() => yellowMaterial.clone());
+              obj.material = newMats;
+          } else {
+              obj.material = yellowMaterial.clone();
+          }
+          obj.renderOrder = 1;
+          meshes.push(obj);
+      }
+  });
+
+  // Optional: slightly scale selected container
+  record.node.scale.set(1.15,1.15,1.15);
 
   highlighted = {
       record: record,
-      hl: Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+      hl: meshes
   };
 }
 
+// ================= RESET HIGHLIGHT =================
 function clearHighlight(){
+  if(!highlighted) return;
 
-  if(!highlighted)return;
+  highlighted.hl.forEach(mesh=>{
+      // Reset original material
+      const originalMat = highlighted.record.origMat;
+      mesh.material = Array.isArray(originalMat) ? originalMat : originalMat;
+      mesh.renderOrder = 0;
+  });
 
-  highlighted.record.node.material = highlighted.record.origMat;
-  highlighted.record.node.renderOrder = 0;
+  // Reset scale
   highlighted.record.node.scale.set(1,1,1);
 
-  highlighted.hl.forEach(m=>m.dispose());
-
-  highlighted=null;
+  highlighted = null;
 }
 
 // ================= DEFAULT CLOSER VIEW =================
