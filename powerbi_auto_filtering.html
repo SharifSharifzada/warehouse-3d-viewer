@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Warehouse 3D Viewer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -12,260 +12,146 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --bg:        #0b0c0e;
-  --surface:   #13151a;
-  --surface2:  #1c1f27;
-  --border:    rgba(255,255,255,0.06);
-  --accent:    #d4ff3e;
-  --accent-dim:#8aaa1c;
-  --text:      #e8e9eb;
-  --muted:     #5a6072;
-  --danger:    #ff5c5c;
-  --success:   #3effa0;
-  --warn:      #ffb23e;
+  --bg:       #0b0c0e;
+  --surface:  #13151a;
+  --surface2: #1c1f27;
+  --border:   rgba(255,255,255,0.06);
+  --accent:   #d4ff3e;
+  --text:     #e8e9eb;
+  --muted:    #5a6072;
+  --danger:   #ff5c5c;
+  --success:  #3effa0;
 }
 
 html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); }
 
-/* ─── Canvas ─── */
-#canvas-wrap {
-  position: fixed;
-  inset: 0;
-}
+#canvas-wrap { position: fixed; inset: 0; }
 #canvas-wrap canvas { display: block; width: 100% !important; height: 100% !important; }
 
-/* ─── Loading Screen ─── */
+/* ─── Loading ─── */
 #loading {
-  position: fixed; inset: 0;
-  background: var(--bg);
+  position: fixed; inset: 0; background: var(--bg);
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  z-index: 100;
-  gap: 20px;
-  transition: opacity 0.6s ease, visibility 0.6s ease;
+  z-index: 100; gap: 18px;
+  transition: opacity 0.5s ease, visibility 0.5s ease;
 }
-#loading.hidden { opacity: 0; visibility: hidden; }
+#loading.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 
 .load-logo {
-  font-family: 'Syne', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.35em;
-  color: var(--muted);
-  text-transform: uppercase;
+  font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700;
+  letter-spacing: 0.35em; text-transform: uppercase; color: var(--muted);
 }
-
 .load-bar-wrap {
-  width: 200px; height: 2px;
-  background: var(--surface2);
-  border-radius: 2px;
-  overflow: hidden;
+  width: 180px; height: 2px; background: var(--surface2);
+  border-radius: 2px; overflow: hidden;
 }
 .load-bar {
-  height: 100%;
-  width: 0%;
-  background: var(--accent);
-  border-radius: 2px;
-  transition: width 0.3s ease;
+  height: 100%; width: 0%; background: var(--accent);
+  border-radius: 2px; transition: width 0.25s ease;
 }
-.load-pct {
-  font-family: 'DM Mono', monospace;
-  font-size: 11px;
-  color: var(--muted);
-}
+.load-pct  { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); }
+.load-status { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.05em; }
 
 /* ─── Top bar ─── */
 #topbar {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  position: fixed; top: 0; left: 0; right: 0; height: 48px;
+  display: flex; align-items: center; justify-content: space-between;
   padding: 0 16px;
-  background: linear-gradient(to bottom, rgba(11,12,14,0.95) 0%, rgba(11,12,14,0) 100%);
-  z-index: 10;
-  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(11,12,14,0.9) 0%, transparent 100%);
+  z-index: 10; pointer-events: none;
 }
 .topbar-brand {
-  font-family: 'Syne', sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.3em;
-  color: var(--muted);
-  text-transform: uppercase;
+  font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.3em; color: var(--muted); text-transform: uppercase;
 }
-.topbar-mode {
-  font-family: 'DM Mono', monospace;
-  font-size: 10px;
-  color: var(--muted);
-  letter-spacing: 0.1em;
-}
+.topbar-mode { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); }
 .topbar-mode span {
-  display: inline-block;
-  padding: 2px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: rgba(255,255,255,0.03);
+  padding: 2px 8px; border: 1px solid var(--border);
+  border-radius: 4px; background: rgba(255,255,255,0.03);
 }
 
-/* ─── Info Panel ─── */
+/* ─── Panel ─── */
 #panel {
-  position: fixed;
-  top: 60px; right: 16px;
-  width: 240px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-  z-index: 10;
+  position: fixed; top: 60px; right: 16px; width: 230px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden; z-index: 10;
   transform: translateX(calc(100% + 20px));
   transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
-#panel.visible {
-  transform: translateX(0);
-}
+#panel.visible { transform: translateX(0); }
 
-.panel-header {
-  padding: 14px 16px 10px;
-  border-bottom: 1px solid var(--border);
-}
+.panel-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
 .panel-label {
-  font-family: 'DM Mono', monospace;
-  font-size: 9px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 6px;
+  font-family: 'DM Mono', monospace; font-size: 9px;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 6px;
 }
 .panel-id {
-  font-family: 'Syne', sans-serif;
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--text);
-  line-height: 1;
-  word-break: break-all;
+  font-family: 'Syne', sans-serif; font-size: 22px;
+  font-weight: 800; color: var(--text); line-height: 1; word-break: break-all;
 }
-
-.panel-body { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
-
-.panel-row {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 8px;
-}
-.panel-row-label {
-  font-family: 'DM Mono', monospace;
-  font-size: 10px;
-  color: var(--muted);
-  letter-spacing: 0.05em;
-}
-.panel-row-val {
-  font-family: 'DM Mono', monospace;
-  font-size: 10px;
-  color: var(--text);
-  text-align: right;
-  word-break: break-all;
-}
+.panel-body { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
+.panel-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.panel-row-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); flex-shrink: 0; }
+.panel-row-val { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text); text-align: right; word-break: break-all; }
+.divider { height: 1px; background: var(--border); margin: 2px 0; }
 
 .status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-family: 'DM Mono', monospace;
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  font-weight: 500;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 8px; border-radius: 4px;
+  font-family: 'DM Mono', monospace; font-size: 9px;
+  letter-spacing: 0.1em; text-transform: uppercase; font-weight: 500;
 }
 .status-badge::before {
-  content: '';
-  display: block;
-  width: 5px; height: 5px;
-  border-radius: 50%;
-  background: currentColor;
+  content: ''; display: block; width: 5px; height: 5px;
+  border-radius: 50%; background: currentColor;
 }
-.status-found   { background: rgba(62,255,160,0.1); color: var(--success); }
-.status-missing { background: rgba(255,92,92,0.1);  color: var(--danger); }
-.status-all     { background: rgba(212,255,62,0.1); color: var(--accent);  }
+.s-found   { background: rgba(62,255,160,0.1);  color: var(--success); }
+.s-missing { background: rgba(255,92,92,0.1);   color: var(--danger); }
 
-.panel-divider {
-  height: 1px;
-  background: var(--border);
-  margin: 2px 0;
-}
-
-/* ─── Error Toast ─── */
+/* ─── Toast ─── */
 #toast {
-  position: fixed;
-  bottom: 20px; left: 50%;
+  position: fixed; bottom: 20px; left: 50%;
   transform: translateX(-50%) translateY(60px);
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--danger);
-  border-radius: 8px;
-  padding: 10px 16px;
-  font-family: 'DM Mono', monospace;
-  font-size: 11px;
-  color: var(--text);
-  z-index: 50;
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  white-space: nowrap;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-left: 3px solid var(--danger); border-radius: 8px;
+  padding: 10px 16px; font-family: 'DM Mono', monospace;
+  font-size: 11px; color: var(--text); z-index: 50;
+  transition: transform 0.4s cubic-bezier(0.16,1,0.3,1); white-space: nowrap;
 }
-#toast.show {
-  transform: translateX(-50%) translateY(0);
-}
+#toast.show { transform: translateX(-50%) translateY(0); }
 
-/* ─── Reset Button ─── */
+/* ─── Reset ─── */
 #btn-reset {
-  position: fixed;
-  bottom: 20px; right: 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 9px 14px;
-  font-family: 'DM Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  cursor: pointer;
-  z-index: 10;
+  position: fixed; bottom: 20px; right: 16px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px 14px;
+  font-family: 'DM Mono', monospace; font-size: 10px;
+  letter-spacing: 0.08em; color: var(--muted);
+  cursor: pointer; z-index: 10; display: none;
   transition: color 0.2s, border-color 0.2s, background 0.2s;
-  display: none;
 }
-#btn-reset:hover {
-  color: var(--text);
-  border-color: rgba(255,255,255,0.15);
-  background: var(--surface2);
-}
+#btn-reset:hover { color: var(--text); border-color: rgba(255,255,255,0.15); background: var(--surface2); }
 #btn-reset.visible { display: block; }
-
-/* ─── Crosshair pulse (selected) ─── */
-@keyframes pulse-ring {
-  0%   { transform: scale(0.8); opacity: 0.8; }
-  100% { transform: scale(1.6); opacity: 0; }
-}
 </style>
 </head>
 <body>
 
 <div id="canvas-wrap"></div>
 
-<!-- Loading -->
 <div id="loading">
-  <div class="load-logo">Warehouse Viewer</div>
+  <div class="load-logo">Birmarket Warehouse</div>
   <div class="load-bar-wrap"><div class="load-bar" id="load-bar"></div></div>
   <div class="load-pct" id="load-pct">0%</div>
+  <div class="load-status" id="load-status">Connecting…</div>
 </div>
 
-<!-- Top bar -->
 <div id="topbar">
-  <div class="topbar-brand">Birmarket WH</div>
+  <div class="topbar-brand">WH Viewer</div>
   <div class="topbar-mode"><span id="mode-label">Loading…</span></div>
 </div>
 
-<!-- Info panel -->
 <div id="panel">
   <div class="panel-header">
     <div class="panel-label">Container</div>
@@ -274,28 +160,21 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
   <div class="panel-body">
     <div class="panel-row">
       <span class="panel-row-label">Status</span>
-      <span id="panel-status" class="status-badge status-found">Found</span>
+      <span id="panel-status" class="status-badge s-found">Located</span>
     </div>
-    <div class="panel-divider"></div>
+    <div class="divider"></div>
     <div class="panel-row">
       <span class="panel-row-label">Node</span>
       <span class="panel-row-val" id="panel-node">—</span>
     </div>
     <div class="panel-row">
-      <span class="panel-row-label">Mesh</span>
-      <span class="panel-row-val" id="panel-mesh">—</span>
-    </div>
-    <div class="panel-row">
       <span class="panel-row-label">Match</span>
-      <span class="panel-row-val" id="panel-match">Exact</span>
+      <span class="panel-row-val" id="panel-match">—</span>
     </div>
   </div>
 </div>
 
-<!-- Toast -->
-<div id="toast" id="toast"></div>
-
-<!-- Reset -->
+<div id="toast"></div>
 <button id="btn-reset" onclick="resetView()">↩ Show All</button>
 
 <script>
@@ -303,40 +182,37 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 //  CONFIG
 // ══════════════════════════════════════════════════════════════
 const CONFIG = {
-  glbUrl: 'https://sharifsharifzada.github.io/warehouse-3d-viewer/warehouse-3d-with-textures1.glb',
-  secret: 'Birmarket-Secure-2024-Y10G2P7M4',
-  highlightColor: 0xd4ff3e,
-  dimColor: 0x1a1d26,
-  dimOpacity: 0.08,
-  cameraLerpSpeed: 0.05,       // 0..1 — lower = smoother/slower
-  cameraZoomFactor: 2.2,       // multiplier of bounding box size for camera distance
-  cameraMinDist: 1.5,
+  glbUrl:            'https://sharifsharifzada.github.io/warehouse-3d-viewer/warehouse-3d-with-textures1.glb',
+  secret:            'Birmarket-Secure-2024-Y10G2P7M4',
+  highlightColor:    0xd4ff3e,
+  highlightEmissive: 0.55,
+  cameraLerp:        0.06,
+  cameraZoom:        2.4,
+  cameraMinDist:     1.5,
 };
 
 // ══════════════════════════════════════════════════════════════
 //  URL PARAMS
+//  IMPORTANT: Remove &v=Timestamp from your DAX measure!
+//  The timestamp forces a full GLB re-download on every slicer
+//  click. Without it the browser caches the GLB (~once per session).
+//
+//  Safe DAX to use:
+//    VAR FullURL = BaseURL & "?token=" & SecretToken
+//                & IF(SelectedContainerID<>"", "&container=" & EncodedID, "")
 // ══════════════════════════════════════════════════════════════
-const params      = new URLSearchParams(window.location.search);
-const urlToken    = params.get('token')    || '';
-const urlContainer = params.get('container') || '';
-
-const tokenOk = urlToken === CONFIG.secret;
-if (!tokenOk) {
-  console.warn('⚠️ Token mismatch — proceeding in demo mode');
-}
+const params       = new URLSearchParams(window.location.search);
+const urlContainer = (params.get('container') || '').trim();
 
 // ══════════════════════════════════════════════════════════════
-//  SCENE STATE
+//  STATE
 // ══════════════════════════════════════════════════════════════
 let scene, camera, renderer, controls, model;
-let allMeshes     = [];   // { node: Object3D, nodeName: string, meshName: string, origMats: Material[] }
-let nodeMap       = new Map(); // nodeName (lowercase) -> mesh record
-
-let camTarget     = new THREE.Vector3();
-let camPos        = new THREE.Vector3();
-let animating     = false;
-
-let selectedNodeName = '';
+let allMeshes      = [];
+let nodeMap        = new Map();   // lowercase name → record
+let highlighted    = null;        // { record, hlMats }
+let camAnimTarget  = null;
+let isAnimating    = false;
 
 // ══════════════════════════════════════════════════════════════
 //  INIT
@@ -346,263 +222,229 @@ function init() {
 
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0b0c0e);
-  scene.fog = new THREE.FogExp2(0x0b0c0e, 0.018);
+  scene.fog = new THREE.FogExp2(0x0b0c0e, 0.010);
 
-  camera = new THREE.PerspectiveCamera(45, wrap.clientWidth / wrap.clientHeight, 0.1, 1000);
-  camera.position.set(14, 10, 14);
+  camera = new THREE.PerspectiveCamera(45, wrap.clientWidth / wrap.clientHeight, 0.1, 2000);
+  camera.position.set(20, 14, 20);
 
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(wrap.clientWidth, wrap.clientHeight);
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.outputEncoding = THREE.sRGBEncoding;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.1;
+  renderer.outputEncoding    = THREE.sRGBEncoding;
+  renderer.toneMapping       = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+  renderer.shadowMap.enabled = false; // off for performance on large model
   wrap.appendChild(renderer.domElement);
 
-  // Lights
-  const ambLight = new THREE.AmbientLight(0xffffff, 0.6);
-  scene.add(ambLight);
+  // Lights — balanced so original GLB textures read correctly
+  scene.add(new THREE.AmbientLight(0xffffff, 0.75));
 
-  const dirLight = new THREE.DirectionalLight(0xfff5e0, 1.2);
-  dirLight.position.set(20, 30, 15);
-  dirLight.castShadow = true;
-  dirLight.shadow.mapSize.set(1024, 1024);
-  scene.add(dirLight);
+  const sun = new THREE.DirectionalLight(0xfff4e0, 1.0);
+  sun.position.set(30, 50, 20);
+  scene.add(sun);
 
-  const fillLight = new THREE.DirectionalLight(0xc8d8ff, 0.4);
-  fillLight.position.set(-15, 8, -10);
-  scene.add(fillLight);
+  const fill = new THREE.DirectionalLight(0xd0e8ff, 0.3);
+  fill.position.set(-20, 10, -15);
+  scene.add(fill);
 
-  // Ground grid
-  const grid = new THREE.GridHelper(60, 60, 0x1a1d26, 0x151720);
-  grid.position.y = -0.01;
+  const grid = new THREE.GridHelper(80, 80, 0x151820, 0x111318);
+  grid.position.y = -0.02;
   scene.add(grid);
 
-  // Controls
   controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
-  controls.dampingFactor = 0.08;
-  controls.minDistance = 0.5;
-  controls.maxDistance = 200;
+  controls.dampingFactor = 0.07;
+  controls.minDistance   = 0.5;
+  controls.maxDistance   = 500;
   controls.maxPolarAngle = Math.PI * 0.5;
 
   window.addEventListener('resize', onResize);
-
   loadModel();
   animate();
 }
 
 // ══════════════════════════════════════════════════════════════
-//  MODEL LOAD
+//  LOAD — no cache-buster on the GLB URL so browser caches it
 // ══════════════════════════════════════════════════════════════
 function loadModel() {
+  setStatus('Fetching model…');
   const loader = new THREE.GLTFLoader();
   loader.load(
     CONFIG.glbUrl,
-    onGLBLoaded,
+    onLoaded,
     (xhr) => {
       if (xhr.lengthComputable) {
         const pct = Math.round((xhr.loaded / xhr.total) * 100);
-        setLoadProgress(pct);
+        setProgress(pct);
+        setStatus(pct < 100 ? `Downloading… ${pct}%` : 'Building scene…');
       }
     },
-    (err) => {
-      console.error('GLB load error:', err);
-      showToast('Failed to load model');
-      hideLoader();
-    }
+    (err) => { console.error(err); showToast('Model load failed'); hideLoader(); }
   );
 }
 
-function onGLBLoaded(gltf) {
+function onLoaded(gltf) {
+  setStatus('Preparing nodes…');
   model = gltf.scene;
-  scene.add(model);
 
-  // Centre model on ground
-  const box = new THREE.Box3().setFromObject(model);
-  const center = box.getCenter(new THREE.Vector3());
-  const size = box.getSize(new THREE.Vector3());
-  model.position.set(-center.x, -box.min.y, -center.z);
-
-  // Collect all mesh nodes
   model.traverse((obj) => {
-    if (obj.isMesh) {
-      const nodeName = obj.name || '';
-      const meshName = obj.geometry ? (obj.geometry.name || nodeName) : nodeName;
-      const origMats = Array.isArray(obj.material)
-        ? obj.material.map(m => m.clone())
-        : [obj.material.clone()];
+    if (!obj.isMesh) return;
+    obj.frustumCulled = true;
 
-      const record = { node: obj, nodeName, meshName, origMats };
-      allMeshes.push(record);
+    // Store a reference to the original material(s) — never mutated
+    const origMat = Array.isArray(obj.material)
+      ? obj.material          // multi-material: keep array as-is
+      : obj.material;         // single material
 
-      // Map by lowercase node name for flexible lookup
-      const key = nodeName.toLowerCase().trim();
-      if (key && !nodeMap.has(key)) {
-        nodeMap.set(key, record);
-      }
-    }
+    const record = { node: obj, nodeName: obj.name || '', origMat };
+    allMeshes.push(record);
+
+    const key = obj.name.toLowerCase().trim();
+    if (key && !nodeMap.has(key)) nodeMap.set(key, record);
   });
 
-  console.log(`✅ Loaded ${allMeshes.length} mesh nodes`);
-  console.log(`🗺️ Node map: ${nodeMap.size} unique names`);
+  // Centre on ground
+  const box    = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  model.position.set(-center.x, -box.min.y, -center.z);
+  scene.add(model);
 
-  fitCameraToModel();
-  setLoadProgress(100);
-  hideLoader();
+  console.log(`✅ ${allMeshes.length} meshes | ${nodeMap.size} named nodes`);
 
-  // Auto-select from URL
-  if (urlContainer) {
-    setTimeout(() => selectContainer(urlContainer), 200);
-  } else {
-    setModeLabel('Full View');
-    updatePanel(null);
-  }
+  fitCamera();
+  setProgress(100);
+
+  setTimeout(() => {
+    hideLoader();
+    if (urlContainer) {
+      selectContainer(urlContainer);
+    } else {
+      setModeLabel('Full View');
+    }
+  }, 250);
 }
 
 // ══════════════════════════════════════════════════════════════
-//  CONTAINER SELECTION
+//  SELECTION — original textures preserved on all other nodes
 // ══════════════════════════════════════════════════════════════
 function selectContainer(id) {
-  const key = id.toString().toLowerCase().trim();
-  let record = nodeMap.get(key);
+  const key = id.toLowerCase().trim();
+  let record    = nodeMap.get(key);
   let matchType = 'Exact';
 
-  // Fuzzy fallback: try partial match
+  // Fuzzy fallback
   if (!record) {
     for (const [k, v] of nodeMap) {
       if (k.includes(key) || key.includes(k)) {
-        record = v;
-        matchType = 'Partial';
-        break;
+        record = v; matchType = 'Partial'; break;
       }
     }
   }
 
+  clearHighlight();
+
   if (!record) {
-    console.warn(`❌ Container not found: "${id}"`);
+    showToast(`Container "${id}" not found`);
     setModeLabel('Not Found');
     updatePanel({ id, found: false });
-    showToast(`Container "${id}" not found in model`);
-    resetMaterials();
     return;
   }
 
-  selectedNodeName = record.nodeName;
-  console.log(`✅ Found: "${record.nodeName}" (${matchType})`);
+  // Build highlight material(s) — clone original, add emissive glow
+  const origMats = Array.isArray(record.origMat) ? record.origMat : [record.origMat];
+  const hlMats   = origMats.map(m => {
+    const h = m.clone();
+    h.emissive          = new THREE.Color(CONFIG.highlightColor);
+    h.emissiveIntensity = CONFIG.highlightEmissive;
+    return h;
+  });
 
-  applyHighlight(record);
+  // Apply highlight (single or array)
+  record.node.material = hlMats.length === 1 ? hlMats[0] : hlMats;
+  record.node.renderOrder = 1;
+
+  highlighted = { record, hlMats };
+
   animateCameraTo(record.node);
   setModeLabel(`Container: ${record.nodeName}`);
   updatePanel({ id, record, found: true, matchType });
   document.getElementById('btn-reset').classList.add('visible');
 }
 
-function applyHighlight(targetRecord) {
-  const highlightMat = new THREE.MeshStandardMaterial({
-    color: CONFIG.highlightColor,
-    emissive: new THREE.Color(CONFIG.highlightColor),
-    emissiveIntensity: 0.5,
-    roughness: 0.3,
-    metalness: 0.2,
-  });
-
-  const dimMat = new THREE.MeshStandardMaterial({
-    color: CONFIG.dimColor,
-    transparent: true,
-    opacity: CONFIG.dimOpacity,
-    roughness: 1,
-    metalness: 0,
-  });
-
-  allMeshes.forEach(({ node, origMats }) => {
-    if (node === targetRecord.node) {
-      // Highlight
-      node.material = highlightMat;
-      node.renderOrder = 1;
-    } else {
-      // Dim others
-      node.material = dimMat;
-    }
-  });
-}
-
-function resetMaterials() {
-  allMeshes.forEach(({ node, origMats }) => {
-    node.material = origMats.length === 1 ? origMats[0] : origMats;
-  });
-  selectedNodeName = '';
+function clearHighlight() {
+  if (!highlighted) return;
+  // Restore original material exactly — textures unchanged
+  highlighted.record.node.material    = highlighted.record.origMat;
+  highlighted.record.node.renderOrder = 0;
+  // Dispose cloned highlight materials to free GPU memory
+  highlighted.hlMats.forEach(m => m.dispose());
+  highlighted = null;
 }
 
 // ══════════════════════════════════════════════════════════════
 //  RESET
 // ══════════════════════════════════════════════════════════════
-window.resetView = function() {
-  resetMaterials();
-  fitCameraToModel();
+window.resetView = function () {
+  clearHighlight();
+  fitCamera();
   setModeLabel('Full View');
-  updatePanel(null);
-  document.getElementById('btn-reset').classList.remove('visible');
   document.getElementById('panel').classList.remove('visible');
+  document.getElementById('btn-reset').classList.remove('visible');
 };
 
 // ══════════════════════════════════════════════════════════════
-//  CAMERA ANIMATION
+//  CAMERA
 // ══════════════════════════════════════════════════════════════
-let camAnimTarget = null; // { position, lookAt }
-
 function animateCameraTo(obj) {
-  const box = new THREE.Box3().setFromObject(obj);
+  const box    = new THREE.Box3().setFromObject(obj);
   const center = box.getCenter(new THREE.Vector3());
   const size   = box.getSize(new THREE.Vector3());
-  const maxDim = Math.max(size.x, size.y, size.z);
-  const dist   = Math.max(maxDim * CONFIG.cameraZoomFactor, CONFIG.cameraMinDist);
+  const maxDim = Math.max(size.x, size.y, size.z, 0.5);
+  const dist   = Math.max(maxDim * CONFIG.cameraZoom, CONFIG.cameraMinDist);
 
-  // Approach from current camera direction but at correct distance
-  const dir = camera.position.clone().sub(controls.target).normalize();
+  const dir    = camera.position.clone().sub(controls.target).normalize();
   const newPos = center.clone().add(dir.multiplyScalar(dist));
-  newPos.y = Math.max(newPos.y, center.y + dist * 0.4);
+  newPos.y     = Math.max(newPos.y, center.y + dist * 0.4);
 
-  camAnimTarget = {
-    position: newPos,
-    lookAt: center.clone(),
-  };
-  animating = true;
+  camAnimTarget = { position: newPos, lookAt: center.clone() };
+  isAnimating   = true;
 }
 
-function fitCameraToModel() {
+function fitCamera() {
   if (!model) return;
-  const box = new THREE.Box3().setFromObject(model);
+  const box    = new THREE.Box3().setFromObject(model);
   const center = box.getCenter(new THREE.Vector3());
   const size   = box.getSize(new THREE.Vector3());
-  const maxDim = Math.max(size.x, size.y, size.z);
-  const dist   = maxDim * 1.6;
+  const dist   = Math.max(size.x, size.y, size.z) * 1.5;
 
   camAnimTarget = {
-    position: new THREE.Vector3(center.x + dist * 0.7, center.y + dist * 0.5, center.z + dist * 0.7),
+    position: new THREE.Vector3(
+      center.x + dist * 0.7,
+      center.y + dist * 0.5,
+      center.z + dist * 0.7
+    ),
     lookAt: center.clone(),
   };
-  animating = true;
+  isAnimating = true;
 }
 
 // ══════════════════════════════════════════════════════════════
-//  ANIMATE LOOP
+//  RENDER LOOP
 // ══════════════════════════════════════════════════════════════
 function animate() {
   requestAnimationFrame(animate);
 
-  if (animating && camAnimTarget) {
-    camera.position.lerp(camAnimTarget.position, CONFIG.cameraLerpSpeed);
-    controls.target.lerp(camAnimTarget.lookAt, CONFIG.cameraLerpSpeed);
+  if (isAnimating && camAnimTarget) {
+    camera.position.lerp(camAnimTarget.position, CONFIG.cameraLerp);
+    controls.target.lerp(camAnimTarget.lookAt,   CONFIG.cameraLerp);
 
-    const posDiff = camera.position.distanceTo(camAnimTarget.position);
-    const tgtDiff = controls.target.distanceTo(camAnimTarget.lookAt);
-    if (posDiff < 0.01 && tgtDiff < 0.01) {
+    if (
+      camera.position.distanceTo(camAnimTarget.position) < 0.02 &&
+      controls.target.distanceTo(camAnimTarget.lookAt)   < 0.02
+    ) {
       camera.position.copy(camAnimTarget.position);
       controls.target.copy(camAnimTarget.lookAt);
-      animating = false;
+      isAnimating = false;
     }
   }
 
@@ -611,60 +453,43 @@ function animate() {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  UI HELPERS
+//  UI
 // ══════════════════════════════════════════════════════════════
-function setLoadProgress(pct) {
+function setProgress(pct) {
   document.getElementById('load-bar').style.width = pct + '%';
-  document.getElementById('load-pct').textContent = pct + '%';
+  document.getElementById('load-pct').textContent  = pct + '%';
 }
-
-function hideLoader() {
-  setTimeout(() => {
-    document.getElementById('loading').classList.add('hidden');
-  }, 400);
-}
-
-function setModeLabel(text) {
-  document.getElementById('mode-label').textContent = text;
-}
+function setStatus(txt)    { document.getElementById('load-status').textContent = txt; }
+function hideLoader()      { document.getElementById('loading').classList.add('hidden'); }
+function setModeLabel(txt) { document.getElementById('mode-label').textContent = txt; }
 
 function updatePanel(info) {
   const panel = document.getElementById('panel');
-
-  if (!info) {
-    panel.classList.remove('visible');
-    return;
-  }
-
+  if (!info) { panel.classList.remove('visible'); return; }
   panel.classList.add('visible');
-
   document.getElementById('panel-id').textContent = info.id || '—';
 
-  const statusEl = document.getElementById('panel-status');
-
+  const st = document.getElementById('panel-status');
   if (!info.found) {
-    statusEl.className = 'status-badge status-missing';
-    statusEl.textContent = 'Not Found';
-    document.getElementById('panel-node').textContent = '—';
-    document.getElementById('panel-mesh').textContent = '—';
+    st.className   = 'status-badge s-missing';
+    st.textContent = 'Not Found';
+    document.getElementById('panel-node').textContent  = '—';
     document.getElementById('panel-match').textContent = '—';
     return;
   }
-
-  statusEl.className = 'status-badge status-found';
-  statusEl.textContent = 'Located';
-  document.getElementById('panel-node').textContent = info.record.nodeName || '—';
-  document.getElementById('panel-mesh').textContent = info.record.meshName || '—';
-  document.getElementById('panel-match').textContent = info.matchType || 'Exact';
+  st.className   = 'status-badge s-found';
+  st.textContent = 'Located';
+  document.getElementById('panel-node').textContent  = info.record.nodeName;
+  document.getElementById('panel-match').textContent = info.matchType;
 }
 
-let toastTimer = null;
+let _toastTimer;
 function showToast(msg) {
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
 }
 
 function onResize() {
@@ -674,9 +499,6 @@ function onResize() {
   renderer.setSize(wrap.clientWidth, wrap.clientHeight);
 }
 
-// ══════════════════════════════════════════════════════════════
-//  START
-// ══════════════════════════════════════════════════════════════
 window.addEventListener('load', init);
 </script>
 </body>
