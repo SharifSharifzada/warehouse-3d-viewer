@@ -10,7 +10,6 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
 <style>
-/* === YOUR ORIGINAL STYLE FULLY PRESERVED === */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
   --bg:#0b0c0e;
@@ -26,8 +25,6 @@
 html, body { width:100%; height:100%; overflow:hidden; background:var(--bg); }
 #canvas-wrap { position:fixed; inset:0; }
 #canvas-wrap canvas { display:block; width:100%!important; height:100%!important; }
-
-/* All your UI CSS remains exactly same */
 </style>
 </head>
 
@@ -37,18 +34,15 @@ html, body { width:100%; height:100%; overflow:hidden; background:var(--bg); }
 
 <script>
 
-// ═══════════════════════════════════════
-// CONFIG (ONLY THIS PART MODIFIED)
-// ═══════════════════════════════════════
+// CONFIG
 const CONFIG = {
   glbUrl:'https://sharifsharifzada.github.io/warehouse-3d-viewer/warehouse-3d-with-textures1.glb',
-  secret:'Birmarket-Secure-2024-Y10G2P7M4',
-  highlightColor:0xff6a00,
-  highlightEmissive:2.5,
+  highlightColor:0x00ffff,     // Bright Cyan (high visibility)
+  highlightEmissive:4.0,      // Strong glow
   cameraLerp:0.08,
   cameraZoom:2.0,
   cameraMinDist:0.3,
-  cameraMaxDist:50   // <-- NEW (replaces cameraFixedDist)
+  cameraMaxDist:50
 };
 
 // URL PARAMS
@@ -61,6 +55,7 @@ let nodeIndexMap=new Map();
 let highlighted=null;
 let camAnimTarget=null;
 let isAnimating=false;
+let pulseTime=0;
 
 // INIT
 function init(){
@@ -141,18 +136,30 @@ function applyHighlight(record){
     h.map=null;
     return h;
   });
+
   record.node.material=hl.length===1?hl[0]:hl;
+  record.node.renderOrder=1;
+
+  // Slight scale increase
+  record.node.scale.set(1.15,1.15,1.15);
+
   highlighted={record,hl};
 }
 
 function clearHighlight(){
   if(!highlighted)return;
+
   highlighted.record.node.material=highlighted.record.origMat;
+  highlighted.record.node.renderOrder=0;
+
+  // Reset scale
+  highlighted.record.node.scale.set(1,1,1);
+
   highlighted.hl.forEach(m=>m.dispose());
   highlighted=null;
 }
 
-// CAMERA FOCUS (UPDATED DIST LOGIC ONLY)
+// CAMERA FOCUS
 function animateCameraTo(obj){
   const box=new THREE.Box3().setFromObject(obj);
   const center=box.getCenter(new THREE.Vector3());
@@ -161,7 +168,7 @@ function animateCameraTo(obj){
 
   const dist=Math.min(
     Math.max(maxDim*CONFIG.cameraZoom,CONFIG.cameraMinDist),
-    CONFIG.cameraMaxDist   // <-- updated
+    CONFIG.cameraMaxDist
   );
 
   const newPos=new THREE.Vector3(
@@ -204,6 +211,13 @@ function animate(){
     if(camera.position.distanceTo(camAnimTarget.position)<0.02){
       isAnimating=false;
     }
+  }
+
+  // Pulse animation
+  if(highlighted){
+    pulseTime+=0.08;
+    const pulse=1.15+Math.sin(pulseTime)*0.05;
+    highlighted.record.node.scale.set(pulse,pulse,pulse);
   }
 
   controls.update();
