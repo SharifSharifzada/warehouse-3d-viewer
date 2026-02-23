@@ -202,15 +202,17 @@ const CONFIG = {
 //    VAR FullURL = BaseURL & "?token=" & SecretToken
 //                & IF(SelectedContainerID<>"", "&container=" & EncodedID, "")
 // ══════════════════════════════════════════════════════════════
-const params       = new URLSearchParams(window.location.search);
-const urlContainer = (params.get('container') || '').trim();
+const params        = new URLSearchParams(window.location.search);
+const urlContainer  = (params.get('container') || '').trim();
+const urlNodeIndex  = params.get('nodeindex') !== null ? parseInt(params.get('nodeindex')) : -1;
 
 // ══════════════════════════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════════════════════════
 let scene, camera, renderer, controls, model;
 let allMeshes      = [];
-let nodeMap        = new Map();   // lowercase name → record
+let nodeMap        = new Map();   // exact node name → record
+let nodeIndexMap   = new Map();   // node index (order in traverse) → record
 let highlighted    = null;        // { record, hlMats }
 let camAnimTarget  = null;
 let isAnimating    = false;
@@ -288,6 +290,7 @@ function onLoaded(gltf) {
   setStatus('Preparing nodes…');
   model = gltf.scene;
 
+  let traverseIndex = 0;
   model.traverse((obj) => {
     if (!obj.isMesh) return;
     obj.frustumCulled = true;
@@ -297,11 +300,13 @@ function onLoaded(gltf) {
       ? obj.material          // multi-material: keep array as-is
       : obj.material;         // single material
 
-    const record = { node: obj, nodeName: obj.name || '', origMat };
+    const record = { node: obj, nodeName: obj.name || '', origMat, nodeIndex: traverseIndex };
     allMeshes.push(record);
 
     const key = obj.name.trim();   // exact, case-preserved
     if (key && !nodeMap.has(key)) nodeMap.set(key, record);
+    nodeIndexMap.set(traverseIndex, record);
+    traverseIndex++;
   });
 
   // Centre on ground
@@ -317,8 +322,10 @@ function onLoaded(gltf) {
 
   setTimeout(() => {
     hideLoader();
-    if (urlContainer) {
-      selectContainer(urlContainer);
+    if (urlNodeIndex >= 0) {
+      selectByIndex(urlNodeIndex);
+    } else if (urlContainer) {
+      selectByName(urlContainer);
     } else {
       setModeLabel('Full View');
     }
@@ -326,45 +333,56 @@ function onLoaded(gltf) {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  SELECTION — original textures preserved on all other nodes
+//  SELECTION — by Node Index (primary, from PBI slicer)
 // ══════════════════════════════════════════════════════════════
-function selectContainer(id) {
-  const key = id.toString().trim();   // keep original case & value
-  const record = nodeMap.get(key);    // exact match only
-  const matchType = 'Exact';
-
+function selectByIndex(index) {
+  const record = nodeIndexMap.get(index);
   clearHighlight();
+  if (!record) {
+    showToast(`Node index ${index} not found`);
+    setModeLabel('Not Found');
+    updatePanel({ id: String(index), found: false });
+    return;
+  }
+  applyHighlight(record);
+  animateCameraTo(record.node);
+  setModeLabel(`#${index} — ${record.nodeName}`);
+  updatePanel({ id: `#${index} — ${record.nodeName}`, record, found: true, matchType: 'Index' });
+  document.getElementById('btn-reset').classList.add('visible');
+}
 
+// ── by Container ID name (legacy / fallback) ──────────────────
+function selectByName(id) {
+  const record = nodeMap.get(id.toString().trim());
+  clearHighlight();
   if (!record) {
     showToast(`Container "${id}" not found`);
     setModeLabel('Not Found');
     updatePanel({ id, found: false });
     return;
   }
+  applyHighlight(record);
+  animateCameraTo(record.node);
+  setModeLabel(`Container: ${record.nodeName}`);
+  updatePanel({ id, record, found: true, matchType: 'Exact' });
+  document.getElementById('btn-reset').classList.add('visible');
+}
 
-  // Build highlight material(s) — clone original, add strong emissive glow
-  // Also override the base color so dark-textured containers still pop
+// ── shared highlight ───────────────────────────────────────────
+function applyHighlight(record) {
   const origMats = Array.isArray(record.origMat) ? record.origMat : [record.origMat];
   const hlMats   = origMats.map(m => {
     const h = m.clone();
     h.color             = new THREE.Color(CONFIG.highlightColor);
     h.emissive          = new THREE.Color(CONFIG.highlightColor);
     h.emissiveIntensity = CONFIG.highlightEmissive;
-    h.map               = null;   // remove texture so color shows clearly
+    h.map               = null;
     h.needsUpdate       = true;
     return h;
   });
-
-  // Apply highlight (single or array)
-  record.node.material = hlMats.length === 1 ? hlMats[0] : hlMats;
+  record.node.material    = hlMats.length === 1 ? hlMats[0] : hlMats;
   record.node.renderOrder = 1;
-
   highlighted = { record, hlMats };
-
-  animateCameraTo(record.node);
-  setModeLabel(`Container: ${record.nodeName}`);
-  updatePanel({ id, record, found: true, matchType });
-  document.getElementById('btn-reset').classList.add('visible');
 }
 
 function clearHighlight() {
