@@ -185,10 +185,11 @@ const CONFIG = {
   glbUrl:            'https://sharifsharifzada.github.io/warehouse-3d-viewer/warehouse-3d-with-textures1.glb',
   secret:            'Birmarket-Secure-2024-Y10G2P7M4',
   highlightColor:    0xd4ff3e,
-  highlightEmissive: 0.55,
-  cameraLerp:        0.06,
-  cameraZoom:        2.4,
-  cameraMinDist:     1.5,
+  highlightEmissive: 1.8,      // strong glow even on textured materials
+  cameraLerp:        0.055,
+  cameraZoom:        3.5,      // distance = maxDim * this (smaller = closer)
+  cameraMinDist:     0.8,      // allow very close zoom for tiny containers
+  cameraFixedDist:   6,        // hard cap: never further than this from container
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -350,12 +351,16 @@ function selectContainer(id) {
     return;
   }
 
-  // Build highlight material(s) — clone original, add emissive glow
+  // Build highlight material(s) — clone original, add strong emissive glow
+  // Also override the base color so dark-textured containers still pop
   const origMats = Array.isArray(record.origMat) ? record.origMat : [record.origMat];
   const hlMats   = origMats.map(m => {
     const h = m.clone();
+    h.color             = new THREE.Color(CONFIG.highlightColor);
     h.emissive          = new THREE.Color(CONFIG.highlightColor);
     h.emissiveIntensity = CONFIG.highlightEmissive;
+    h.map               = null;   // remove texture so color shows clearly
+    h.needsUpdate       = true;
     return h;
   });
 
@@ -399,12 +404,22 @@ function animateCameraTo(obj) {
   const box    = new THREE.Box3().setFromObject(obj);
   const center = box.getCenter(new THREE.Vector3());
   const size   = box.getSize(new THREE.Vector3());
-  const maxDim = Math.max(size.x, size.y, size.z, 0.5);
-  const dist   = Math.max(maxDim * CONFIG.cameraZoom, CONFIG.cameraMinDist);
+  const maxDim = Math.max(size.x, size.y, size.z, 0.3);
 
-  const dir    = camera.position.clone().sub(controls.target).normalize();
-  const newPos = center.clone().add(dir.multiplyScalar(dist));
-  newPos.y     = Math.max(newPos.y, center.y + dist * 0.4);
+  // Use the smaller of: proportional distance OR fixed close cap
+  // This ensures tiny containers still get a tight zoom
+  const proportional = maxDim * CONFIG.cameraZoom;
+  const dist = Math.min(
+    Math.max(proportional, CONFIG.cameraMinDist),
+    CONFIG.cameraFixedDist
+  );
+
+  // Approach from a 45° front-right-above angle for clear visibility
+  const newPos = new THREE.Vector3(
+    center.x + dist * 0.7,
+    center.y + dist * 0.6,
+    center.z + dist * 0.7
+  );
 
   camAnimTarget = { position: newPos, lookAt: center.clone() };
   isAnimating   = true;
