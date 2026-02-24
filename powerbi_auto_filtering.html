@@ -78,8 +78,7 @@ function init(){
   const wrap = document.getElementById('canvas-wrap');
 
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0b0c0e);  // Always dark background
-  scene.fog = null;  // No fog
+  scene.background = new THREE.Color(0xf5f5f5);  // Light gray - matches real warehouse
 
   camera = new THREE.PerspectiveCamera(45, wrap.clientWidth/wrap.clientHeight, 0.1, 2000);
   camera.position.set(20, 14, 20);
@@ -100,11 +99,11 @@ function init(){
   sun2.position.set(-30, 30, -20);
   scene.add(sun2);
 
-  // Add ground plane for reference (subtle)
+  // Add ground plane (light gray to match warehouse)
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(500, 500),
     new THREE.MeshStandardMaterial({ 
-      color: 0x1a1a1a,  // Very dark gray (visible against black)
+      color: 0xdddddd,  // Light gray
       roughness: 0.9
     })
   );
@@ -112,8 +111,8 @@ function init(){
   ground.position.y = 0;
   scene.add(ground);
 
-  // Add grid for spatial reference (very subtle)
-  const grid = new THREE.GridHelper(500, 100, 0x2a2a2a, 0x1a1a1a);
+  // Add grid for spatial reference
+  const grid = new THREE.GridHelper(500, 100, 0xcccccc, 0xe0e0e0);
   grid.position.y = 0.01;
   scene.add(grid);
 
@@ -250,16 +249,38 @@ function selectContainer(containerIdentifier){
 
   console.log(`Found ${matchedObjects.length} matching object(s) for ID ${targetId}`);
 
-  // STEP 1: Hide ALL objects
-  console.log('🔄 Hiding all objects first...');
+  // STEP 1: Hide ALL objects EXCEPT matched ones
+  console.log('🔄 Processing visibility...');
   let hiddenCount = 0;
+  let keptVisible = 0;
+  
+  // Create a set of matched object UUIDs for fast lookup
+  const matchedUUIDs = new Set(matchedObjects.map(m => m.object.uuid));
+  
   allObjects.forEach(item => {
-    if(item.object.isMesh || item.object.isGroup || item.object.isObject3D){
-      item.object.visible = false;
-      hiddenCount++;
+    // Check if this object or any of its parents are matched
+    let isMatched = matchedUUIDs.has(item.object.uuid);
+    let currentParent = item.object.parent;
+    while(currentParent && !isMatched){
+      if(matchedUUIDs.has(currentParent.uuid)){
+        isMatched = true;
+      }
+      currentParent = currentParent.parent;
+    }
+    
+    if(isMatched){
+      // Keep matched objects visible
+      item.object.visible = true;
+      keptVisible++;
+    } else {
+      // Hide non-matched objects
+      if(item.object.isMesh || item.object.isGroup || item.object.isObject3D){
+        item.object.visible = false;
+        hiddenCount++;
+      }
     }
 
-    // Reset material
+    // Reset material for all meshes
     if(item.object.isMesh){
       const originalMat = originalMaterials.get(item.object.uuid);
       if(originalMat){
@@ -268,16 +289,16 @@ function selectContainer(containerIdentifier){
       item.object.scale.set(1, 1, 1);
     }
   });
-  console.log(`  Hidden ${hiddenCount} objects`);
+  console.log(`  Hidden ${hiddenCount} objects, kept ${keptVisible} visible`);
 
   if(matchedObjects.length > 0){
-    console.log('🎨 Showing and highlighting ONLY selected objects...');
+    console.log('🎨 Highlighting selected objects...');
 
-    // STEP 2: Show and highlight ONLY matched objects
+    // STEP 2: Highlight matched objects and ensure visibility chain
     matchedObjects.forEach((item, index) => {
       console.log(`  Processing match ${index + 1}:`, item.name, 'Type:', item.type);
       
-      // Make visible
+      // FORCE visible
       item.object.visible = true;
       
       // Make sure ALL parents are visible
@@ -309,43 +330,58 @@ function selectContainer(containerIdentifier){
 
 // ================= FULL YELLOW HIGHLIGHT =================
 function highlightObject(obj){
+  console.log('  🎨 Applying highlight to:', obj.name, 'Type:', obj.type);
+  
+  // SUPER BRIGHT YELLOW material
   const yellowMaterial = new THREE.MeshStandardMaterial({
-    color: 0xffff00,          // FULL YELLOW
-    emissive: 0xffff00,       // Yellow glow
-    emissiveIntensity: 3.0,   // Very bright
-    roughness: 0.4,
-    metalness: 0.1,
+    color: 0xffff00,          // Pure yellow
+    emissive: 0xffff00,       // Emissive yellow
+    emissiveIntensity: 5.0,   // VERY BRIGHT (increased from 3.0)
+    roughness: 0.3,
+    metalness: 0.2,
     transparent: false,
-    opacity: 1.0
+    opacity: 1.0,
+    side: THREE.DoubleSide     // Render both sides
   });
+
+  let highlightedCount = 0;
 
   // Apply to the object itself if it's a mesh
   if(obj.isMesh){
     if(Array.isArray(obj.material)){
       obj.material = obj.material.map(() => yellowMaterial.clone());
+      highlightedCount += obj.material.length;
     } else {
       obj.material = yellowMaterial.clone();
+      highlightedCount++;
     }
     obj.renderOrder = 999;
-    console.log('  ✅ Applied yellow to:', obj.name);
+    obj.visible = true;  // Force visible
+    console.log('    ✅ Applied yellow to main object');
   }
 
-  // Apply to all child meshes
+  // Apply to ALL child meshes
   obj.traverse((child) => {
-    if(child.isMesh && child !== obj){
+    if(child.isMesh){
       if(Array.isArray(child.material)){
         child.material = child.material.map(() => yellowMaterial.clone());
+        highlightedCount += child.material.length;
       } else {
         child.material = yellowMaterial.clone();
+        highlightedCount++;
       }
       child.renderOrder = 999;
-      console.log('  ✅ Applied yellow to child:', child.name);
+      child.visible = true;  // Force visible
+      console.log('    ✅ Applied yellow to child:', child.name || child.type);
     }
   });
 
-  // Scale effect
+  console.log(`    Total materials highlighted: ${highlightedCount}`);
+
+  // Scale effect (make it slightly bigger)
   if(obj.scale){
     obj.scale.set(1.15, 1.15, 1.15);
+    console.log('    ✅ Scaled to 1.15x');
   }
 }
 
