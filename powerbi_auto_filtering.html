@@ -249,80 +249,37 @@ function selectContainer(containerIdentifier){
 
   console.log(`Found ${matchedObjects.length} matching object(s) for ID ${targetId}`);
 
-  // STEP 1: Hide ALL objects EXCEPT matched ones
-  console.log('🔄 Processing visibility...');
-  let hiddenCount = 0;
-  let keptVisible = 0;
-  
-  // Create a set of matched object UUIDs for fast lookup
-  const matchedUUIDs = new Set(matchedObjects.map(m => m.object.uuid));
-  
+  // Reset all materials first
+  console.log('🔄 Resetting all materials...');
   allObjects.forEach(item => {
-    // Check if this object or any of its parents are matched
-    let isMatched = matchedUUIDs.has(item.object.uuid);
-    let currentParent = item.object.parent;
-    while(currentParent && !isMatched){
-      if(matchedUUIDs.has(currentParent.uuid)){
-        isMatched = true;
-      }
-      currentParent = currentParent.parent;
-    }
-    
-    if(isMatched){
-      // Keep matched objects visible
-      item.object.visible = true;
-      keptVisible++;
-    } else {
-      // Hide non-matched objects
-      if(item.object.isMesh || item.object.isGroup || item.object.isObject3D){
-        item.object.visible = false;
-        hiddenCount++;
-      }
-    }
-
-    // Reset material for all meshes
     if(item.object.isMesh){
       const originalMat = originalMaterials.get(item.object.uuid);
       if(originalMat){
         item.object.material = originalMat.clone();
       }
       item.object.scale.set(1, 1, 1);
+      item.object.renderOrder = 0;
     }
   });
-  console.log(`  Hidden ${hiddenCount} objects, kept ${keptVisible} visible`);
 
   if(matchedObjects.length > 0){
-    console.log('🎨 Highlighting selected objects...');
+    console.log('🎨 Highlighting selected container in YELLOW...');
 
-    // STEP 2: Highlight matched objects and ensure visibility chain
+    // Highlight ONLY the matched objects (but keep everything else visible)
     matchedObjects.forEach((item, index) => {
       console.log(`  Processing match ${index + 1}:`, item.name, 'Type:', item.type);
-      
-      // FORCE visible
-      item.object.visible = true;
-      
-      // Make sure ALL parents are visible
-      let parent = item.object.parent;
-      let parentLevel = 0;
-      while(parent){
-        parent.visible = true;
-        parentLevel++;
-        console.log(`    Made parent ${parentLevel} visible:`, parent.name || parent.type);
-        parent = parent.parent;
-      }
 
-      // Apply FULL YELLOW highlight
+      // Apply YELLOW highlight to stand out
       highlightObject(item.object);
-      console.log(`  ✅ ${index + 1}. Highlighted: ${item.name}`);
+      console.log(`  ✅ ${index + 1}. Highlighted in YELLOW: ${item.name}`);
     });
 
-    // STEP 3: Zoom to selected container
-    console.log('📷 Focusing camera (close zoom)...');
-    animateCameraTo(matchedObjects[0].object);
-    console.log('✅ Camera focused on container');
+    // Keep full warehouse view - don't zoom
+    console.log('📷 Keeping full warehouse view');
+    console.log('✅ Container highlighted in yellow within full warehouse');
   } else {
     console.log('❌ No container found with ID:', targetId);
-    resetToFullView();
+    console.log('💡 Showing full warehouse');
   }
 
   console.log('═══════════════════════════════\n');
