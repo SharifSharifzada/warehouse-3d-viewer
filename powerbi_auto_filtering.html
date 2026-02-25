@@ -29,9 +29,9 @@
       glbUrl: 'https://sharifsharifzada.github.io/warehouse-3d-viewer/warehouse-3d-allin1.glb',
       accessToken: 'Birmarket-Secure-2024-Y10G2P7M4',
       cameraLerp: 0.08,
-      cameraZoom: 2.5,      // proportional zoom factor
-      cameraMinDist: 1.0,   // never closer than this
-      cameraMaxDist: 12     // never further than this from selected container
+      cameraZoom: 2.5,
+      cameraMinDist: 1.0,
+      cameraMaxDist: 12
     };
 
     // ================= URL PARAMS =================
@@ -61,12 +61,23 @@
     // ================= STATE =================
     let scene, camera, renderer, controls, model;
     let allObjects = [];
-    let nodeIndexMap = new Map();      // traverse index → item
+    let nodeIndexMap = new Map();
+    let numericIdMap = new Map();       // OPTIMIZED: numericId → [items]
     let originalMaterials = new Map();
-    let highlighted = null;
+    let highlightedMeshes = [];         // OPTIMIZED: track only highlighted meshes
     let camAnimTarget = null;
     let isAnimating = false;
     let glbLoaded = false;
+
+    // OPTIMIZED: single shared highlight material — no clone per mesh
+    const HIGHLIGHT_MAT = new THREE.MeshStandardMaterial({
+      color: 0xff6a00,
+      emissive: 0xff6a00,
+      emissiveIntensity: 3.0,
+      roughness: 0.3,
+      metalness: 0.2,
+      side: THREE.DoubleSide
+    });
 
     console.log('🎯 container param:', urlContainer, '| nodeindex param:', urlNodeIndex);
 
@@ -133,7 +144,6 @@
           console.log('✅ GLB Loaded');
           model = gltf.scene;
 
-          // Center model at ground level
           const box = new THREE.Box3().setFromObject(model);
           const center = box.getCenter(new THREE.Vector3());
           model.position.set(-center.x, -box.min.y, -center.z);
@@ -145,6 +155,13 @@
             const item = { object: child, name: child.name || '', uuid: child.uuid, type: child.type, numericId: numericId, nodeIndex: ti };
             allObjects.push(item);
             nodeIndexMap.set(ti, item);
+
+            // OPTIMIZED: build numericId → items map at load time (O(1) lookup later)
+            if (numericId !== null) {
+              if (!numericIdMap.has(numericId)) numericIdMap.set(numericId, []);
+              numericIdMap.get(numericId).push(item);
+            }
+
             ti++;
 
             // Store original materials
@@ -220,7 +237,9 @@
       }
 
       resetMaterials();
-      const matchedObjects = allObjects.filter(obj => obj.numericId === targetId);
+
+      // OPTIMIZED: O(1) map lookup instead of .filter() scan
+      const matchedObjects = numericIdMap.get(targetId) || [];
       console.log('Found', matchedObjects.length, 'match(es) for ID', targetId);
 
       if (matchedObjects.length > 0) {
@@ -234,32 +253,20 @@
 
     // ================= HIGHLIGHT =================
     function applyHighlight(obj) {
-      const yellowMat = new THREE.MeshStandardMaterial({
-        color: 0xff6a00,
-        emissive: 0xff6a00,
-        emissiveIntensity: 3.0,
-        roughness: 0.3,
-        metalness: 0.2,
-        side: THREE.DoubleSide
-      });
-
       if (obj.isMesh) {
-        if (Array.isArray(obj.material)) {
-          obj.material = obj.material.map(() => yellowMat.clone());
-        } else {
-          obj.material = yellowMat.clone();
-        }
+        const matKey = Array.isArray(obj.material) ? obj.uuid + '_0' : obj.uuid;
+        highlightedMeshes.push({ mesh: obj, matKey: matKey, origMat: originalMaterials.get(matKey) });
+        obj.material = HIGHLIGHT_MAT;  // OPTIMIZED: shared instance, no clone
         obj.renderOrder = 999;
         obj.visible = true;
       }
 
       obj.traverse((child) => {
+        if (child === obj) return;
         if (child.isMesh) {
-          if (Array.isArray(child.material)) {
-            child.material = child.material.map(() => yellowMat.clone());
-          } else {
-            child.material = yellowMat.clone();
-          }
+          const matKey = Array.isArray(child.material) ? child.uuid + '_0' : child.uuid;
+          highlightedMeshes.push({ mesh: child, matKey: matKey, origMat: originalMaterials.get(matKey) });
+          child.material = HIGHLIGHT_MAT;  // OPTIMIZED: shared instance, no clone
           child.renderOrder = 999;
           child.visible = true;
         }
@@ -267,21 +274,13 @@
     }
 
     // ================= RESET MATERIALS =================
+    // OPTIMIZED: only touches previously highlighted meshes, no full scan
     function resetMaterials() {
-      allObjects.forEach(item => {
-        if (item.object.isMesh) {
-          if (Array.isArray(item.object.material)) {
-            item.object.material = item.object.material.map((_, idx) => {
-              const orig = originalMaterials.get(item.object.uuid + '_' + idx);
-              return orig ? orig.clone() : item.object.material[idx];
-            });
-          } else {
-            const orig = originalMaterials.get(item.object.uuid);
-            if (orig) item.object.material = orig.clone();
-          }
-          item.object.renderOrder = 0;
-        }
+      highlightedMeshes.forEach(({ mesh, origMat }) => {
+        if (origMat) mesh.material = origMat;
+        mesh.renderOrder = 0;
       });
+      highlightedMeshes = [];
     }
 
     // ================= RESET TO FULL VIEW =================
