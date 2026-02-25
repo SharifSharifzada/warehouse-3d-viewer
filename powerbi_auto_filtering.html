@@ -7,6 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
 
 <style>
 html, body {
@@ -19,6 +20,15 @@ html, body {
 #canvas-wrap {
     position:fixed;
     inset:0;
+}
+.label {
+    background: rgba(0,0,0,0.75);
+    color: white;
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 6px;
+    white-space: nowrap;
+    font-family: Arial, sans-serif;
 }
 </style>
 </head>
@@ -33,9 +43,9 @@ const CONFIG = {
   glbUrl:'https://sharifsharifzada.github.io/warehouse-3d-viewer/warehouse-3d-allin1.glb',
   accessToken:'Birmarket-Secure-2024-Y10G2P7M4',
   cameraLerp:0.08,
-  cameraZoom:2.5,      // proportional zoom factor
-  cameraMinDist:1.0,   // never closer than this
-  cameraMaxDist:12     // never further than this from selected container
+  cameraZoom:2.5,
+  cameraMinDist:1.0,
+  cameraMaxDist:12
 };
 
 // ================= URL PARAMS =================
@@ -64,9 +74,9 @@ function validateAccess(){
 validateAccess();
 
 // ================= STATE =================
-let scene, camera, renderer, controls, model;
+let scene, camera, renderer, controls, labelRenderer, model;
 let allObjects = [];
-let nodeIndexMap = new Map();   // traverse index → item
+let nodeIndexMap = new Map();
 let originalMaterials = new Map();
 let highlighted = null;
 let camAnimTarget = null;
@@ -89,6 +99,14 @@ function init(){
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(wrap.clientWidth, wrap.clientHeight);
   wrap.appendChild(renderer.domElement);
+
+  // CSS2D label renderer
+  labelRenderer = new THREE.CSS2DRenderer();
+  labelRenderer.setSize(wrap.clientWidth, wrap.clientHeight);
+  labelRenderer.domElement.style.position = 'absolute';
+  labelRenderer.domElement.style.top = '0px';
+  labelRenderer.domElement.style.pointerEvents = 'none';
+  wrap.appendChild(labelRenderer.domElement);
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.75));
   const sun = new THREE.DirectionalLight(0xffffff, 1);
@@ -122,6 +140,21 @@ function init(){
   animate();
 }
 
+// ================= ADD LABEL =================
+function addLabel(object, text){
+  const div = document.createElement('div');
+  div.className = 'label';
+  div.textContent = text;
+
+  const label = new THREE.CSS2DObject(div);
+
+  const box = new THREE.Box3().setFromObject(object);
+  const size = box.getSize(new THREE.Vector3());
+
+  label.position.set(0, size.y + 0.2, 0);
+  object.add(label);
+}
+
 // ================= LOAD MODEL =================
 function loadModel(){
   const loader = new THREE.GLTFLoader();
@@ -133,7 +166,6 @@ function loadModel(){
       console.log('✅ GLB Loaded');
       model = gltf.scene;
 
-      // Centre model at ground level
       const box = new THREE.Box3().setFromObject(model);
       const center = box.getCenter(new THREE.Vector3());
       model.position.set(-center.x, -box.min.y, -center.z);
@@ -165,6 +197,12 @@ function loadModel(){
             originalMaterials.set(child.uuid, child.material.clone());
           }
         }
+
+        // ✅ Add labels only for numeric containers
+        if(child.isMesh && numericId !== null){
+          addLabel(child, child.name);
+        }
+
       });
 
       allObjects.forEach(item => { item.object.visible = true; });
@@ -189,7 +227,7 @@ function loadModel(){
   );
 }
 
-// ================= SELECT BY NODE INDEX (primary - from PBI) =================
+// ================= SELECT BY NODE INDEX =================
 function selectByIndex(index){
   if(!glbLoaded){ console.log('⏳ Not loaded yet'); return; }
   const item = nodeIndexMap.get(index);
@@ -207,7 +245,7 @@ function selectByIndex(index){
   animateCameraTo(item.object);
 }
 
-// ================= SELECT BY CONTAINER ID STRING (fallback) =================
+// ================= SELECT BY CONTAINER =================
 function selectContainer(containerIdentifier){
   if(!glbLoaded){ return; }
   if(!containerIdentifier || containerIdentifier === ''){
@@ -226,7 +264,6 @@ function selectContainer(containerIdentifier){
   console.log('Found', matchedObjects.length, 'match(es) for ID', targetId);
 
   if(matchedObjects.length > 0){
-    // Highlight all matches, zoom to first
     matchedObjects.forEach(item => applyHighlight(item.object));
     animateCameraTo(matchedObjects[0].object);
   } else {
@@ -235,10 +272,10 @@ function selectContainer(containerIdentifier){
   }
 }
 
-// ================= HIGHLIGHT — no scale change, normal size =================
+// ================= HIGHLIGHT =================
 function applyHighlight(obj){
   const yellowMat = new THREE.MeshStandardMaterial({
-    color:            0xff6a00,   // vivid orange
+    color:            0xff6a00,
     emissive:         0xff6a00,
     emissiveIntensity: 3.0,
     roughness:        0.3,
@@ -267,8 +304,6 @@ function applyHighlight(obj){
       child.visible = true;
     }
   });
-
-  // ✅ NO scale change — object stays at normal size (1, 1, 1)
 }
 
 // ================= RESET MATERIALS =================
@@ -286,7 +321,6 @@ function resetMaterials(){
       }
       item.object.renderOrder = 0;
     }
-    // ✅ NO scale reset needed since we never change scale
   });
 }
 
@@ -296,7 +330,7 @@ function resetToFullView(){
   fitCameraToModel();
 }
 
-// ================= CAMERA — fit full model =================
+// ================= CAMERA FIT =================
 function fitCameraToModel(){
   if(!model) return;
   const box  = new THREE.Box3().setFromObject(model);
@@ -315,7 +349,7 @@ function fitCameraToModel(){
   isAnimating = true;
 }
 
-// ================= CAMERA — zoom close to selected object =================
+// ================= CAMERA TO OBJECT =================
 function animateCameraTo(obj){
   const box    = new THREE.Box3().setFromObject(obj);
   const center = box.getCenter(new THREE.Vector3());
@@ -338,7 +372,7 @@ function animateCameraTo(obj){
   isAnimating = true;
 }
 
-// ================= LOOP =================
+// ================= ANIMATE LOOP =================
 function animate(){
   requestAnimationFrame(animate);
 
@@ -354,6 +388,7 @@ function animate(){
 
   controls.update();
   renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
 }
 
 // ================= RESIZE =================
@@ -362,9 +397,11 @@ function onResize(){
   camera.aspect = wrap.clientWidth / wrap.clientHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+  labelRenderer.setSize(wrap.clientWidth, wrap.clientHeight);
 }
 
 window.addEventListener('load', init);
+
 </script>
 </body>
 </html>
