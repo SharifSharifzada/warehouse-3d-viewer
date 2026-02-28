@@ -214,10 +214,10 @@
           current = current.parent;
         }
 
-        if (numericId !== null && numericId !== hoveredId) {
+        if (numericId !== null && numericId <= 9999 && numericId !== hoveredId) {
           hoveredId = numericId;
           showTooltip(numericId);
-        } else if (numericId === null) {
+        } else if (numericId === null || numericId > 9999) {
           hoveredId = null;
           hideTooltip();
         }
