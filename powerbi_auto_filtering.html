@@ -8,21 +8,69 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <style>
     html, body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      overflow: hidden;
+      width: 100%; height: 100%;
+      margin: 0; overflow: hidden;
       background: #0b0c0e;
     }
+    #canvas-wrap { position: fixed; inset: 0; }
 
-    #canvas-wrap {
+    /* ── Tooltip ── */
+    #tooltip {
       position: fixed;
-      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+      display: none;
+      background: rgba(10, 12, 16, 0.92);
+      border: 1px solid rgba(255, 106, 0, 0.55);
+      border-radius: 8px;
+      padding: 10px 14px;
+      box-shadow: 0 4px 24px rgba(255,106,0,0.18), 0 1px 6px rgba(0,0,0,0.5);
+      backdrop-filter: blur(8px);
+      min-width: 160px;
+      transform: translate(14px, -50%);
+      transition: opacity 0.12s ease;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    #tooltip .tt-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 2px 0;
+    }
+    #tooltip .tt-row:not(:last-child) {
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      margin-bottom: 5px;
+      padding-bottom: 5px;
+    }
+    #tooltip .tt-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,106,0,0.85);
+    }
+    #tooltip .tt-value {
+      font-size: 13px;
+      font-weight: 500;
+      color: #f0f0f0;
+      text-align: right;
     }
   </style>
 </head>
 <body>
   <div id="canvas-wrap"></div>
+  <div id="tooltip">
+    <div class="tt-row">
+      <span class="tt-label">Container</span>
+      <span class="tt-value" id="tt-container">—</span>
+    </div>
+    <div class="tt-row">
+      <span class="tt-label">Store</span>
+      <span class="tt-value" id="tt-store">—</span>
+    </div>
+  </div>
+
   <script>
     // ================= CONFIG =================
     const CONFIG = {
@@ -36,9 +84,24 @@
 
     // ================= URL PARAMS =================
     const params = new URLSearchParams(window.location.search);
-    const urlToken = params.get('token');
-    const urlContainer = params.get('container');
-    const urlNodeIndex = params.get('nodeindex') !== null ? parseInt(params.get('nodeindex')) : -1;
+    const urlToken       = params.get('token');
+    const urlContainer   = params.get('container');
+    const urlNodeIndex   = params.get('nodeindex') !== null ? parseInt(params.get('nodeindex')) : -1;
+
+    // Container data passed from Power BI as JSON → ?data=[{"id":1,"store":"Alpha"},...]
+    let containerDataMap = new Map(); // numericId → { id, store }
+    try {
+      const raw = params.get('data');
+      if (raw) {
+        const arr = JSON.parse(decodeURIComponent(raw));
+        arr.forEach(item => {
+          containerDataMap.set(parseInt(item.id), item);
+        });
+        console.log('📋 Container data loaded:', containerDataMap.size, 'records');
+      }
+    } catch(e) {
+      console.warn('⚠️ Could not parse container data:', e);
+    }
 
     // ================= TOKEN VALIDATION =================
     function validateAccess() {
@@ -50,8 +113,7 @@
             <div style="font-size:100px;margin-bottom:30px;">🔒</div>
             <h1 style="font-size:48px;margin:20px 0;">Access Denied</h1>
             <p style="font-size:18px;opacity:0.8;">Unauthorized access to this resource</p>
-          </div>
-        `;
+          </div>`;
         throw new Error('Unauthorized');
       }
       console.log('✅ Access granted');
@@ -61,23 +123,24 @@
     // ================= STATE =================
     let scene, camera, renderer, controls, model;
     let allObjects = [];
-    let nodeIndexMap = new Map();
-    let numericIdMap = new Map();       // OPTIMIZED: numericId → [items]
+    let nodeIndexMap  = new Map();
+    let numericIdMap  = new Map();
     let originalMaterials = new Map();
-    let highlightedMeshes = [];         // OPTIMIZED: track only highlighted meshes
+    let highlightedMeshes = [];
     let camAnimTarget = null;
-    let isAnimating = false;
-    let glbLoaded = false;
+    let isAnimating   = false;
+    let glbLoaded     = false;
 
-    // OPTIMIZED: single shared highlight material — no clone per mesh
     const HIGHLIGHT_MAT = new THREE.MeshStandardMaterial({
-      color: 0xff6a00,
-      emissive: 0xff6a00,
-      emissiveIntensity: 3.0,
-      roughness: 0.3,
-      metalness: 0.2,
-      side: THREE.DoubleSide
+      color: 0xff6a00, emissive: 0xff6a00, emissiveIntensity: 3.0,
+      roughness: 0.3, metalness: 0.2, side: THREE.DoubleSide
     });
+
+    // Raycasting state
+    const raycaster  = new THREE.Raycaster();
+    const mouse      = new THREE.Vector2();
+    let hoveredId    = null;   // currently hovered numericId
+    const tooltip    = document.getElementById('tooltip');
 
     console.log('🎯 container param:', urlContainer, '| nodeindex param:', urlNodeIndex);
 
@@ -96,41 +159,88 @@
       renderer.setSize(wrap.clientWidth, wrap.clientHeight);
       wrap.appendChild(renderer.domElement);
 
-      // Lights
       scene.add(new THREE.AmbientLight(0xffffff, 0.75));
       const sun = new THREE.DirectionalLight(0xffffff, 1);
-      sun.position.set(30, 50, 20);
-      scene.add(sun);
+      sun.position.set(30, 50, 20); scene.add(sun);
       const sun2 = new THREE.DirectionalLight(0xffffff, 0.5);
-      sun2.position.set(-30, 30, -20);
-      scene.add(sun2);
+      sun2.position.set(-30, 30, -20); scene.add(sun2);
 
-      // Ground
       const ground = new THREE.Mesh(
         new THREE.PlaneGeometry(500, 500),
         new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.9 })
       );
       ground.rotation.x = -Math.PI / 2;
-      ground.position.y = 0;
       scene.add(ground);
 
-      // Grid
       const grid = new THREE.GridHelper(500, 100, 0xcccccc, 0xe0e0e0);
-      grid.position.y = 0.01;
-      scene.add(grid);
+      grid.position.y = 0.01; scene.add(grid);
 
-      // Controls
       controls = new THREE.OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
       controls.dampingFactor = 0.07;
-      controls.enableZoom = true;
-      controls.enableRotate = true;
-      controls.enablePan = true;
 
       window.addEventListener('resize', onResize);
 
+      // ── Tooltip mouse tracking ──
+      renderer.domElement.addEventListener('mousemove', onMouseMove);
+      renderer.domElement.addEventListener('mouseleave', hideTooltip);
+
       loadModel();
       animate();
+    }
+
+    // ================= TOOLTIP =================
+    function onMouseMove(e) {
+      // Update mouse position for raycasting
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
+      mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+
+      // Move tooltip with cursor
+      tooltip.style.left = e.clientX + 'px';
+      tooltip.style.top  = e.clientY + 'px';
+
+      if (!glbLoaded) return;
+
+      raycaster.setFromCamera(mouse, camera);
+      const meshes = [];
+      model.traverse(c => { if (c.isMesh) meshes.push(c); });
+      const hits = raycaster.intersectObjects(meshes, false);
+
+      if (hits.length > 0) {
+        const hitObj   = hits[0].object;
+        // Walk up to find the root object that has a numeric name
+        let current    = hitObj;
+        let numericId  = null;
+        while (current) {
+          const m = current.name?.match(/^(\d+)(?:\.(\d+))?$/);
+          if (m) { numericId = parseInt(m[1]); break; }
+          current = current.parent;
+        }
+
+        if (numericId !== null && numericId !== hoveredId) {
+          hoveredId = numericId;
+          showTooltip(numericId);
+        } else if (numericId === null) {
+          hoveredId = null;
+          hideTooltip();
+        }
+      } else {
+        hoveredId = null;
+        hideTooltip();
+      }
+    }
+
+    function showTooltip(numericId) {
+      const data = containerDataMap.get(numericId);
+      document.getElementById('tt-container').textContent = numericId;
+      document.getElementById('tt-store').textContent     = data?.store || '—';
+      tooltip.style.display = 'block';
+    }
+
+    function hideTooltip() {
+      tooltip.style.display = 'none';
+      hoveredId = null;
     }
 
     // ================= LOAD MODEL =================
@@ -138,85 +248,60 @@
       const loader = new THREE.GLTFLoader();
       console.log('📦 Loading:', CONFIG.glbUrl);
 
-      loader.load(
-        CONFIG.glbUrl,
-        function(gltf) {
-          console.log('✅ GLB Loaded');
-          model = gltf.scene;
+      loader.load(CONFIG.glbUrl, function(gltf) {
+        console.log('✅ GLB Loaded');
+        model = gltf.scene;
 
-          const box = new THREE.Box3().setFromObject(model);
-          const center = box.getCenter(new THREE.Vector3());
-          model.position.set(-center.x, -box.min.y, -center.z);
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        model.position.set(-center.x, -box.min.y, -center.z);
 
-          let ti = 0;
-          model.traverse((child) => {
-            const match = child.name?.match(/^(\d+)(?:\.(\d+))?$/);
-            const numericId = match ? parseInt(match[1]) : null;
-            const item = { object: child, name: child.name || '', uuid: child.uuid, type: child.type, numericId: numericId, nodeIndex: ti };
-            allObjects.push(item);
-            nodeIndexMap.set(ti, item);
+        let ti = 0;
+        model.traverse((child) => {
+          const match     = child.name?.match(/^(\d+)(?:\.(\d+))?$/);
+          const numericId = match ? parseInt(match[1]) : null;
+          const item      = { object: child, name: child.name || '', uuid: child.uuid, type: child.type, numericId, nodeIndex: ti };
+          allObjects.push(item);
+          nodeIndexMap.set(ti, item);
 
-            // OPTIMIZED: build numericId → items map at load time (O(1) lookup later)
-            if (numericId !== null) {
-              if (!numericIdMap.has(numericId)) numericIdMap.set(numericId, []);
-              numericIdMap.get(numericId).push(item);
-            }
-
-            ti++;
-
-            // Store original materials
-            if (child.isMesh) {
-              if (Array.isArray(child.material)) {
-                child.material.forEach((mat, idx) => {
-                  originalMaterials.set(child.uuid + '_' + idx, mat.clone());
-                });
-              } else {
-                originalMaterials.set(child.uuid, child.material.clone());
-              }
-            }
-          });
-
-          allObjects.forEach(item => item.object.visible = true);
-          scene.add(model);
-          glbLoaded = true;
-
-          if (urlNodeIndex >= 0) {
-            setTimeout(() => selectByIndex(urlNodeIndex), 500);
-          } else if (urlContainer) {
-            setTimeout(() => selectContainer(urlContainer), 500);
-          } else {
-            fitCameraToModel();
+          if (numericId !== null) {
+            if (!numericIdMap.has(numericId)) numericIdMap.set(numericId, []);
+            numericIdMap.get(numericId).push(item);
           }
-        },
-        (xhr) => {
-          if (xhr.lengthComputable) {
-            const pct = (xhr.loaded / xhr.total * 100).toFixed(0);
-            console.log('Loading: ' + pct + '%');
+          ti++;
+
+          if (child.isMesh) {
+            if (Array.isArray(child.material)) {
+              child.material.forEach((mat, idx) => {
+                originalMaterials.set(child.uuid + '_' + idx, mat.clone());
+              });
+            } else {
+              originalMaterials.set(child.uuid, child.material.clone());
+            }
           }
-        },
-        (error) => {
-          console.error('❌ Error loading GLB:', error);
-        }
-      );
+        });
+
+        allObjects.forEach(item => item.object.visible = true);
+        scene.add(model);
+        glbLoaded = true;
+
+        if (urlNodeIndex >= 0)  setTimeout(() => selectByIndex(urlNodeIndex),   500);
+        else if (urlContainer)  setTimeout(() => selectContainer(urlContainer), 500);
+        else                    fitCameraToModel();
+      },
+      (xhr) => {
+        if (xhr.lengthComputable)
+          console.log('Loading: ' + (xhr.loaded / xhr.total * 100).toFixed(0) + '%');
+      },
+      (error) => console.error('❌ Error loading GLB:', error));
     }
 
     // ================= SELECT BY NODE INDEX =================
     function selectByIndex(index) {
-      if (!glbLoaded) {
-        console.log('⏳ Not loaded yet');
-        return;
-      }
-
+      if (!glbLoaded) return;
       const item = nodeIndexMap.get(index);
       resetMaterials();
-
-      if (!item) {
-        console.log('❌ Node index not found:', index);
-        fitCameraToModel();
-        return;
-      }
-
-      console.log('✅ Selecting node index', index, '→', item.name);
+      if (!item) { fitCameraToModel(); return; }
       applyHighlight(item.object);
       animateCameraTo(item.object);
     }
@@ -224,29 +309,15 @@
     // ================= SELECT BY CONTAINER ID =================
     function selectContainer(containerIdentifier) {
       if (!glbLoaded) return;
-      if (!containerIdentifier || containerIdentifier === '') {
-        resetToFullView();
-        return;
-      }
-
+      if (!containerIdentifier || containerIdentifier === '') { resetToFullView(); return; }
       const targetId = parseInt(containerIdentifier);
-      if (isNaN(targetId)) {
-        console.log('❌ Invalid numeric ID:', containerIdentifier);
-        resetToFullView();
-        return;
-      }
-
+      if (isNaN(targetId)) { resetToFullView(); return; }
       resetMaterials();
-
-      // OPTIMIZED: O(1) map lookup instead of .filter() scan
       const matchedObjects = numericIdMap.get(targetId) || [];
-      console.log('Found', matchedObjects.length, 'match(es) for ID', targetId);
-
       if (matchedObjects.length > 0) {
         matchedObjects.forEach(item => applyHighlight(item.object));
         animateCameraTo(matchedObjects[0].object);
       } else {
-        console.log('❌ Not found:', targetId);
         fitCameraToModel();
       }
     }
@@ -255,26 +326,23 @@
     function applyHighlight(obj) {
       if (obj.isMesh) {
         const matKey = Array.isArray(obj.material) ? obj.uuid + '_0' : obj.uuid;
-        highlightedMeshes.push({ mesh: obj, matKey: matKey, origMat: originalMaterials.get(matKey) });
-        obj.material = HIGHLIGHT_MAT;  // OPTIMIZED: shared instance, no clone
+        highlightedMeshes.push({ mesh: obj, matKey, origMat: originalMaterials.get(matKey) });
+        obj.material = HIGHLIGHT_MAT;
         obj.renderOrder = 999;
         obj.visible = true;
       }
-
       obj.traverse((child) => {
         if (child === obj) return;
         if (child.isMesh) {
           const matKey = Array.isArray(child.material) ? child.uuid + '_0' : child.uuid;
-          highlightedMeshes.push({ mesh: child, matKey: matKey, origMat: originalMaterials.get(matKey) });
-          child.material = HIGHLIGHT_MAT;  // OPTIMIZED: shared instance, no clone
+          highlightedMeshes.push({ mesh: child, matKey, origMat: originalMaterials.get(matKey) });
+          child.material = HIGHLIGHT_MAT;
           child.renderOrder = 999;
           child.visible = true;
         }
       });
     }
 
-    // ================= RESET MATERIALS =================
-    // OPTIMIZED: only touches previously highlighted meshes, no full scan
     function resetMaterials() {
       highlightedMeshes.forEach(({ mesh, origMat }) => {
         if (origMat) mesh.material = origMat;
@@ -283,74 +351,49 @@
       highlightedMeshes = [];
     }
 
-    // ================= RESET TO FULL VIEW =================
-    function resetToFullView() {
-      resetMaterials();
-      fitCameraToModel();
-    }
+    function resetToFullView() { resetMaterials(); fitCameraToModel(); }
 
-    // ================= CAMERA — fit full model =================
     function fitCameraToModel() {
       if (!model) return;
-
-      const box = new THREE.Box3().setFromObject(model);
+      const box    = new THREE.Box3().setFromObject(model);
       const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3());
-      const dist = Math.max(size.x, size.y, size.z) * 0.9;
-
+      const size   = box.getSize(new THREE.Vector3());
+      const dist   = Math.max(size.x, size.y, size.z) * 0.9;
       camAnimTarget = {
-        position: new THREE.Vector3(
-          center.x + dist * 0.6,
-          center.y + dist * 0.45,
-          center.z + dist * 0.6
-        ),
+        position: new THREE.Vector3(center.x + dist * 0.6, center.y + dist * 0.45, center.z + dist * 0.6),
         lookAt: center.clone()
       };
       isAnimating = true;
     }
 
-    // ================= CAMERA — zoom to selected object =================
     function animateCameraTo(obj) {
-      const box = new THREE.Box3().setFromObject(obj);
+      const box    = new THREE.Box3().setFromObject(obj);
       const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3());
+      const size   = box.getSize(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z, 0.3);
-      const dist = Math.min(
-        Math.max(maxDim * CONFIG.cameraZoom, CONFIG.cameraMinDist),
-        CONFIG.cameraMaxDist
-      );
-
+      const dist   = Math.min(Math.max(maxDim * CONFIG.cameraZoom, CONFIG.cameraMinDist), CONFIG.cameraMaxDist);
       camAnimTarget = {
-        position: new THREE.Vector3(
-          center.x + dist * 0.7,
-          center.y + dist * 0.6,
-          center.z + dist * 0.7
-        ),
+        position: new THREE.Vector3(center.x + dist * 0.7, center.y + dist * 0.6, center.z + dist * 0.7),
         lookAt: center.clone()
       };
       isAnimating = true;
     }
 
-    // ================= LOOP =================
     function animate() {
       requestAnimationFrame(animate);
-
       if (isAnimating && camAnimTarget) {
         camera.position.lerp(camAnimTarget.position, CONFIG.cameraLerp);
         controls.target.lerp(camAnimTarget.lookAt, CONFIG.cameraLerp);
-
         if (camera.position.distanceTo(camAnimTarget.position) < 0.02) {
           camera.position.copy(camAnimTarget.position);
           controls.target.copy(camAnimTarget.lookAt);
           isAnimating = false;
         }
       }
-
       controls.update();
       renderer.render(scene, camera);
     }
 
-    // ================= RESIZE =================
     function onResize() {
       const wrap = document.getElementById('canvas-wrap');
       camera.aspect = wrap.clientWidth / wrap.clientHeight;
