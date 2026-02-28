@@ -303,9 +303,12 @@
     // ================= SELECT BY CONTAINER ID =================
     function selectContainer(containerIdentifier) {
       if (!glbLoaded) return;
-      if (!containerIdentifier || containerIdentifier === '') { resetToFullView(); return; }
+      if (!containerIdentifier || containerIdentifier === '' || containerIdentifier === '-1' || containerIdentifier === 'undefined' || containerIdentifier === 'null') {
+        resetToFullView();
+        return;
+      }
       const targetId = parseInt(containerIdentifier);
-      if (isNaN(targetId)) { resetToFullView(); return; }
+      if (isNaN(targetId) || targetId < 0) { resetToFullView(); return; }
       resetMaterials();
       const matchedObjects = numericIdMap.get(targetId) || [];
       if (matchedObjects.length > 0) {
