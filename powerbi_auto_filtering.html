@@ -65,10 +65,6 @@
       <span class="tt-label">Container</span>
       <span class="tt-value" id="tt-container">—</span>
     </div>
-    <div class="tt-row">
-      <span class="tt-label">Store</span>
-      <span class="tt-value" id="tt-store">—</span>
-    </div>
   </div>
 
   <script>
@@ -232,9 +228,7 @@
     }
 
     function showTooltip(numericId) {
-      const data = containerDataMap.get(numericId);
       document.getElementById('tt-container').textContent = numericId;
-      document.getElementById('tt-store').textContent     = data?.store || '—';
       tooltip.style.display = 'block';
     }
 
