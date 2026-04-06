@@ -1,0 +1,35 @@
+import powerbi from "powerbi-visuals-api";
+import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions;
+import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
+import IVisual = powerbi.extensibility.visual.IVisual;
+export declare class Visual implements IVisual {
+    private container;
+    private renderer;
+    private scene;
+    private camera;
+    private controls;
+    private animationId;
+    private tooltip;
+    private statusBar;
+    private selectionManager;
+    private host;
+    private meshMap;
+    private originalMaterials;
+    private selectionMap;
+    private selectedIds;
+    private dataContainerIds;
+    private outlineMeshes;
+    private glbLoaded;
+    constructor(options: VisualConstructorOptions);
+    private addLights;
+    private addUI;
+    private loadGLB;
+    private clearOutlines;
+    private updateHighlights;
+    private getHitName;
+    private onClick;
+    private onMouseMove;
+    private animate;
+    update(options: VisualUpdateOptions): void;
+    destroy(): void;
+}

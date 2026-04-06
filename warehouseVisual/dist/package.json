@@ -1,0 +1,17 @@
+{
+		"version": "1.0.0.0",
+		"author": {"name":"Sharif Sharifzada","email":"sharif@example.com"},
+		"resources": [
+			{
+				"resourceId": "rId0",
+				"sourceType": 5,
+				"file": "resources/warehouseVisual0F0C3A3442214F639A80089E3226EBFA.pbiviz.json"
+			}
+		],
+		"visual": {"name":"warehouseVisual","displayName":"warehouseVisual","guid":"warehouseVisual0F0C3A3442214F639A80089E3226EBFA","visualClassName":"Visual","version":"1.0.0.0","description":"Warehouse 3D Viewer","supportUrl":"https://github.com/SharifSharifzada/warehouse-3d-viewer","gitHubUrl":""},
+		"metadata": {
+			"pbivizjson": {
+				"resourceId": "rId0"
+			}
+		}
+	}
