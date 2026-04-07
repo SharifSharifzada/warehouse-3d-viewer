@@ -1,0 +1,23 @@
+name: Build Power BI Visual
+on:
+  push:
+    branches: [ main ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Install pbiviz
+        run: npm install -g powerbi-visuals-tools
+      - name: Install dependencies
+        run: cd warehouse-3d-viewer/warehouseVisual && npm install
+      - name: Build visual
+        run: cd warehouse-3d-viewer/warehouseVisual && node --max-old-space-size=8192 $(which pbiviz) package
+      - name: Upload pbiviz file
+        uses: actions/upload-artifact@v3
+        with:
+          name: visual-package
+          path: warehouse-3d-viewer/warehouseVisual/dist/*.pbiviz
